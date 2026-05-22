@@ -1,17 +1,19 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/quotient/quotient/apps/api/internal/auth"
 	"github.com/quotient/quotient/apps/api/internal/handlers"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 )
 
-func New(verifier *auth.Verifier, corsOrigin string, profileHandler *handlers.ProfileHandler) *chi.Mux {
+func New(verifier *auth.Verifier, corsOrigin string, profileHandler *handlers.ProfileHandler, readyz http.HandlerFunc) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.CORS(corsOrigin))
 	r.Get("/healthz", handlers.Healthz)
-	r.Get("/readyz", handlers.Readyz)
+	r.Get("/readyz", readyz)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.RequireAuth(verifier))

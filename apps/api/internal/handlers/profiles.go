@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/quotient/quotient/apps/api/internal/middleware"
@@ -10,7 +12,7 @@ import (
 
 type ProfileRepo interface {
 	Get(ctx context.Context, userID string) (map[string]any, error)
-	Update(ctx context.Context, userID string, patch map[string]any) error
+	Update(ctx context.Context, userID string, patch map[string]any) (map[string]any, error)
 }
 
 type ProfileHandler struct {
@@ -29,7 +31,12 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := h.repo.Get(r.Context(), uid)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "DB_ERROR", err.Error())
+		if errors.Is(err, ErrProfileNotFound) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "profile not found")
+			return
+		}
+		slog.Error("profile get failed", "user", uid, "err", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load profile")
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
@@ -41,6 +48,7 @@ func (h *ProfileHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096) // 4KB max for profile patch
 	var patch map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid json")
@@ -54,12 +62,17 @@ func (h *ProfileHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "ui_intensity invalid")
 		return
 	}
-	if err := h.repo.Update(r.Context(), uid, patch); err != nil {
-		writeError(w, http.StatusInternalServerError, "DB_ERROR", err.Error())
+	updated, err := h.repo.Update(r.Context(), uid, patch)
+	if err != nil {
+		if errors.Is(err, ErrProfileNotFound) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "profile not found")
+			return
+		}
+		slog.Error("profile update failed", "user", uid, "err", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to update profile")
 		return
 	}
-	p, _ := h.repo.Get(r.Context(), uid)
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

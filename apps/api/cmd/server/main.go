@@ -39,10 +39,11 @@ func main() {
 	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret)
 	profileRepo := handlers.NewPgProfileRepo(pool)
 	profileHandler := handlers.NewProfileHandler(profileRepo)
+	readyz := handlers.ReadyzHandler(pool)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           router.New(verifier, cfg.CORSOrigin, profileHandler),
+		Handler:           router.New(verifier, cfg.CORSOrigin, profileHandler, readyz),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

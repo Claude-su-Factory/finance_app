@@ -21,8 +21,11 @@ func (r *fakeRepo) Get(ctx context.Context, uid string) (map[string]any, error) 
 	return r.getResp, nil
 }
 
-func (r *fakeRepo) Update(ctx context.Context, uid string, patch map[string]any) error {
-	return r.updErr
+func (r *fakeRepo) Update(ctx context.Context, uid string, patch map[string]any) (map[string]any, error) {
+	if r.updErr != nil {
+		return nil, r.updErr
+	}
+	return r.getResp, nil
 }
 
 func reqWithUser(method, path string, body []byte, uid string) *http.Request {
