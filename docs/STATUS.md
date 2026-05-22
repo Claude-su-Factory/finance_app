@@ -4,14 +4,15 @@
 
 ## 현재 Phase
 
-**Phase 1 — MVP W1 실행 (T1~T12 완료, T13~T15 외부 셋업 차단)**
+**Phase 1 — W1 완료 + W2a 완료. W2b plan 작성 대기.**
 
 ## 진행 중
 
+- [ ] W2b plan 작성 (cron 워커 + 마켓 API + 백필 CLI)
 - [ ] W1-T13 Sentry + PostHog (외부 DSN 필요)
 - [ ] W1-T14 Fly + Vercel 배포 (외부 계정 필요)
-- [ ] W1-T15 GitHub Actions CI/CD (GitHub repo + FLY_API_TOKEN 필요)
-- [ ] W1-T16 통합 동작 검증 (T13~T15 후)
+- [ ] W1-T15 GitHub Actions CI/CD (외부 토큰 필요)
+- [ ] W1-T16 통합 동작 검증 (W2b·W3+ 후 풀 E2E)
   - ✅ 섹션 1: 정체성·카피
   - ⚠️ 섹션 2: 정보 구조 (잠정 합의, 섹션 6에서 락인됨 — 본 항목 보존용)
   - ✅ 섹션 3: 데이터 모델
@@ -38,6 +39,16 @@
 - ✅ W1-T10 비밀번호 재설정 (`c0459f0`)
 - ✅ W1-T11 앱 셸 (사이드바·티커 placeholder·상태바) + 500 페이지 (`b6b93e7`)
 - ✅ W1-T12 온보딩 wizard 2단계 (`f23e86b`)
+- ✅ W2a-T1 instruments + aliases + 핵심 시드 (KOSPI·SPX·USD_KRW 등 7개) (`fd89564`)
+- ✅ W2a-T2 prices + quotes 마이그레이션 (`4fedf5f`)
+- ✅ W2a-T3 economic_indicators + fx_rates + 마켓 RLS (12 정책) (`8a44d4e`)
+- ✅ W2a-T4·T5 backoff helper + 5 모델 (`a4410ed`)
+- ✅ W2a-T6 KIND 어댑터 (KR 종목 마스터, EUC-KR HTML) (`5bd8c8a`)
+- ✅ W2a-T7 Yahoo 어댑터 (piquette/finance-go, KR.KS/.KQ + US) (`cf4a9b3`)
+- ✅ W2a-T8 FX 어댑터 (frankfurter.dev) (`5653e85`)
+- ✅ W2a-T9 FRED + ECOS 어댑터 + 백오프 (`d2ff081`)
+- ✅ W2a-T10 ingest 패키지 (Batch + COPY) + testcontainers 통합 테스트 3/3 (`2ac5ca4`)
+- ✅ W2a-T11 config FRED/ECOS 키 (`2a343fe`)
 
 ## 알려진 결함 / 백로그
 
@@ -52,6 +63,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-22 W2a 전체 (T1~T11) 완료. 4 마이그레이션 + 5 어댑터(KIND·Yahoo·FX·FRED·ECOS) + 백오프 + 6 모델 + ingest(Batch+COPY) + testcontainers. KRX 직접 호출 불가 확인 후 KIND+Yahoo 단일화.
 - 2026-05-22 W1-T11·T12 완료. 앱 셸 + 온보딩 wizard 2단계.
 - 2026-05-22 W1-T8·T9·T10 완료. Supabase SSR/proxy 미들웨어 + 가입/로그인/OAuth/비밀번호 재설정 (PIPA 준수).
 - 2026-05-22 W1-T7 완료. Next.js 16 + Tailwind v4 + shadcn v4 (스펙 15/v3에서 최신 GA로 이전).
