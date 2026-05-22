@@ -7,7 +7,7 @@ import (
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 )
 
-func New(verifier *auth.Verifier, corsOrigin string) *chi.Mux {
+func New(verifier *auth.Verifier, corsOrigin string, profileHandler *handlers.ProfileHandler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.CORS(corsOrigin))
 	r.Get("/healthz", handlers.Healthz)
@@ -15,7 +15,8 @@ func New(verifier *auth.Verifier, corsOrigin string) *chi.Mux {
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.RequireAuth(verifier))
-		// /v1 라우트는 Task 6에서 추가
+		r.Get("/v1/profile", profileHandler.Get)
+		r.Patch("/v1/profile", profileHandler.Patch)
 	})
 
 	return r

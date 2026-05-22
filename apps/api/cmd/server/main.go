@@ -13,6 +13,8 @@ import (
 
 	"github.com/quotient/quotient/apps/api/internal/auth"
 	"github.com/quotient/quotient/apps/api/internal/config"
+	"github.com/quotient/quotient/apps/api/internal/db"
+	"github.com/quotient/quotient/apps/api/internal/handlers"
 	"github.com/quotient/quotient/apps/api/internal/router"
 )
 
@@ -26,11 +28,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := context.Background()
+	pool, err := db.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("db connect failed", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
 	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret)
+	profileRepo := handlers.NewPgProfileRepo(pool)
+	profileHandler := handlers.NewProfileHandler(profileRepo)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           router.New(verifier, cfg.CORSOrigin),
+		Handler:           router.New(verifier, cfg.CORSOrigin, profileHandler),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
