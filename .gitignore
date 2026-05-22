@@ -1,0 +1,28 @@
+# Node
+node_modules/
+.next/
+out/
+.vercel/
+
+# Go
+apps/api/server
+apps/api/tmp/
+*.exe
+
+# Env
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Testing
+coverage/
+*.out
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
