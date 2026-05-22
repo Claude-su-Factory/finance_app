@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 
 // PIPA: 약관·개인정보 처리방침 분리 동의 + 만 14세 이상 확인
@@ -61,13 +62,13 @@ export function SignupForm() {
       <div className="space-y-2">
         <label className="flex items-start gap-2 text-xs text-fg-muted">
           <input type="checkbox" {...register("agree_terms")} className="mt-1" />
-          <span><a href="/terms" className="underline">서비스 약관</a>에 동의합니다.</span>
+          <span><Link href="/terms" className="underline">서비스 약관</Link>에 동의합니다.</span>
         </label>
         {errors.agree_terms && <p className="text-bb-down text-xs">{errors.agree_terms.message}</p>}
 
         <label className="flex items-start gap-2 text-xs text-fg-muted">
           <input type="checkbox" {...register("agree_privacy")} className="mt-1" />
-          <span><a href="/privacy" className="underline">개인정보 처리방침</a>에 동의합니다.</span>
+          <span><Link href="/privacy" className="underline">개인정보 처리방침</Link>에 동의합니다.</span>
         </label>
         {errors.agree_privacy && <p className="text-bb-down text-xs">{errors.agree_privacy.message}</p>}
 
