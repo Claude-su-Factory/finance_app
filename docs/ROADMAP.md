@@ -2,7 +2,7 @@
 
 ## 현재 추천 다음 작업
 
-브레인스토밍 섹션 4 (데이터 수집 파이프라인) 결정 → 섹션 5 (AI 채팅 흐름) → 섹션 6 (정보 구조 재확인) → ... → 섹션 9까지 완성 → 스펙 자체 검토 → 사용자 승인 → 구현 계획 작성.
+W3 plan 작성 — 포트폴리오 holdings + watchlist + CRUD UI + 홈 대시보드. W2b 종료 시점에 schedule.JobUpdateIndexQuotes의 polling 대상을 holdings/watchlist union으로 확장.
 
 ## Phase 0 — 스펙 (현재)
 
@@ -21,8 +21,6 @@
 |---|---|
 | 1 | Supabase 프로젝트·스키마·RLS |
 | 1 | Go 백엔드 스캐폴딩 (Echo/Chi) + Supabase JWT 검증 |
-| 1 | 마켓 데이터 수집 워커 (KRX·Yahoo·환율·지표) |
-| 1 | 종목 마스터 + 시세 캐시 |
 | 1 | Next.js 앱 셸 (사이드바·상단 티커·블룸버그 톤) |
 | 1 | 포트폴리오 CRUD UI + API |
 | 1 | 홈 대시보드 (총 자산·도넛·일일 브리핑) |

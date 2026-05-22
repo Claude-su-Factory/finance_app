@@ -4,11 +4,10 @@
 
 ## 현재 Phase
 
-**Phase 1 — W1 완료 + W2a 완료. W2b plan 작성 대기.**
+**Phase 1 — W1·W2a·W2b 완료. W3 (포트폴리오·watchlist) 작성 대기.**
 
 ## 진행 중
 
-- [ ] W2b plan 작성 (cron 워커 + 마켓 API + 백필 CLI)
 - [ ] W1-T13 Sentry + PostHog (외부 DSN 필요)
 - [ ] W1-T14 Fly + Vercel 배포 (외부 계정 필요)
 - [ ] W1-T15 GitHub Actions CI/CD (외부 토큰 필요)
@@ -49,6 +48,17 @@
 - ✅ W2a-T9 FRED + ECOS 어댑터 + 백오프 (`d2ff081`)
 - ✅ W2a-T10 ingest 패키지 (Batch + COPY) + testcontainers 통합 테스트 3/3 (`2ac5ca4`)
 - ✅ W2a-T11 config FRED/ECOS 키 (`2a343fe`)
+- ✅ W2b-T1 market_hours helper (KR·US 장중) (`15a368e`)
+- ✅ W2b-T2 yahoo_symbols helper (`4a5d82d`)
+- ✅ W2b-T3 cron 스켈레톤 (robfig/cron, 6 잡 SkipIfStillRunning) (`c2342a6`)
+- ✅ W2b-T4 JobUpdateInstruments + 시드 alias (KIND KOSPI+KOSDAQ) (`a5a59f3`)
+- ✅ W2b-T5 JobUpdate{KR,US}Prices (Yahoo .KS 통합) (`c0e5686`, `945f2f8`)
+- ✅ W2b-T6 JobUpdateIndexQuotes (60s TTL, 장중) (`af9ea09`)
+- ✅ W2b-T7 JobUpdateFXRates (frankfurter, fx_rates+quotes 동시) (`8b67100`)
+- ✅ W2b-T8 JobUpdateIndicators (FRED DFF/DGS10 + ECOS 722Y001) (`c336fd0`)
+- ✅ W2b-T9·10·11 마켓 API (/v1/market/ticker, /v1/instruments/search·select) + cron 워커 main.go 통합 (`a6f75e0`)
+- ✅ W2b-T12 TopTicker 실데이터 + visibility skip (`951690c`)
+- ✅ W2b-T13 5년 백필 CLI (cmd/backfill) (`d2c24e3`)
 
 ## 알려진 결함 / 백로그
 
@@ -60,9 +70,14 @@
 - **Go 1.25 강제**: pgx/v5 v5.9.2가 Go 1.25 요구. Task 14 Dockerfile · Task 15 CI 모두 `golang:1.25-alpine` / `go-version: "1.25"` 사용 필요
 - **Supabase Auth JWT secret**: CLI v2.98이 legacy 키 노출 안 함. 사용자가 dashboard에서 "Legacy JWT Secret" 활성화 필요. JWKS 마이그레이션 백로그
 - **온보딩 단계 수**: 스펙 §6은 3단계, W1 구현은 2단계 (holdings API 미구현). W3에서 3단계로 복원 예정
+- **KOSDAQ 종목 cron 일봉 누락**: `JobUpdateKRPrices`가 `.KS` 기본만 시도. KOSDAQ 종목은 backfill CLI(`-market KOSDAQ`)로 별도 백필 후 cron이 일별 갱신 못 함. W3에서 `instruments.market` 컬럼 추가 검토
+- **US 장중 NY Friday 후반 세션 누락**: `IsUSMarketOpen`이 토요일 일괄 false. KST 토요일 새벽 NY Friday 정규장(quotes 분 단위 폴링) skip. 일봉(prices)은 06:00 cron이 별도 처리 → 데이터 손실 없음
+- **US 장중 DST 미반영**: KST 23:30~06:00 고정. 미국 일광절약시간 기간 30분 어긋남
+- **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
 
 ## 최근 변경 이력
 
+- 2026-05-22 W2b 전체 완료. cron 워커 6 잡(robfig/cron + SkipIfStillRunning) + 마켓 API 3 라우트 + TopTicker 실데이터 + 5년 백필 CLI. 시드 alias 자동 등록(§10-9) 포함. 알려진 한계: KOSDAQ .KS fallback, NY Friday session 누락, DST 미반영.
 - 2026-05-22 W2a 전체 (T1~T11) 완료. 4 마이그레이션 + 5 어댑터(KIND·Yahoo·FX·FRED·ECOS) + 백오프 + 6 모델 + ingest(Batch+COPY) + testcontainers. KRX 직접 호출 불가 확인 후 KIND+Yahoo 단일화.
 - 2026-05-22 W1-T11·T12 완료. 앱 셸 + 온보딩 wizard 2단계.
 - 2026-05-22 W1-T8·T9·T10 완료. Supabase SSR/proxy 미들웨어 + 가입/로그인/OAuth/비밀번호 재설정 (PIPA 준수).
