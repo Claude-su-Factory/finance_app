@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/quotient/quotient/apps/api/internal/auth"
 	"github.com/quotient/quotient/apps/api/internal/config"
 	"github.com/quotient/quotient/apps/api/internal/router"
 )
@@ -25,9 +26,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret)
+
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           router.New(),
+		Handler:           router.New(verifier, cfg.CORSOrigin),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
