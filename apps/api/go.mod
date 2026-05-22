@@ -1,6 +1,6 @@
 module github.com/quotient/quotient/apps/api
 
-go 1.25.0
+go 1.23
 
 require (
 	github.com/caarlos0/env/v10 v10.0.0
