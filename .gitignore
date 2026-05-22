@@ -18,6 +18,13 @@ apps/api/tmp/
 .vscode/
 .idea/
 .DS_Store
+*.swp
+*.swo
+
+# Secrets / certs
+*.pem
+*.key
+*.crt
 
 # Testing
 coverage/
