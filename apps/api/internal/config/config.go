@@ -9,6 +9,8 @@ type Config struct {
 	SupabaseJWTSecret string `env:"SUPABASE_JWT_SECRET,required"`
 	CORSOrigin        string `env:"CORS_ORIGIN" envDefault:"http://localhost:3000"`
 	SentryDSN         string `env:"SENTRY_DSN_API"`
+	FREDAPIKey        string `env:"FRED_API_KEY"`
+	ECOSAPIKey        string `env:"ECOS_API_KEY"`
 }
 
 func Load() (*Config, error) {
