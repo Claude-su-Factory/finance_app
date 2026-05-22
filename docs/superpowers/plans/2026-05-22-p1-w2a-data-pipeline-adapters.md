@@ -364,204 +364,198 @@ git add apps/api/ && git commit -m "feat(api): 모델 추가 (Instrument·PriceB
 
 ---
 
-## Task 6: KRX 어댑터 (Referer 헤더 + ISIN 매핑)
+## Task 6: KR 마켓 어댑터 — KIND (종목 마스터) + Yahoo (시세)
 
-**⚠️ SPIKE 필수**: subagent 라이브 테스트에서 Referer 단독으로는 `LOGOUT` 응답을 받음 (2026-05). **Task 6 본격 구현 전에 30분 spike를 먼저 수행**:
-- 단계 1: 브라우저 DevTools로 data.krx.co.kr 실제 요청 캡처 (PCAP/HAR)
-- 단계 2: 어떤 헤더·쿠키·OTP 단계가 필요한지 확인 (`getJsonData.cmd` 직접 호출인지, `GenerateOTP.cmd` 선행인지)
-- 단계 3: 응답 키가 `OutBlock_1`/`output`/`output1` 중 무엇인지 확인
-- 단계 4: 아래 의사 코드를 실제 흐름에 맞춰 수정한 후 본 Task 진행
+**⚠️ SPIKE 결과 (2026-05-22, agent a34a0c6...)**: `data.krx.co.kr`의 모든 BLD 엔드포인트(`MDCSTAT01901`, `MDCSTAT01701`, OTP 흐름 포함)가 `LOGOUT` 응답. KRX가 2025년 말 로그인 벽 뒤로 이전. 직접 호출 불가능.
 
-만약 spike 후 KRX 직접 호출이 비현실적이면 다음 대안:
-- **대안 A**: 한국투자증권 KIS Open API 채택 — 사용자 본인 계좌 등록 필요 (Phase 3 일부 조기 도입)
-- **대안 B**: KRX 데이터를 일일 ZIP 다운로드 + 파싱으로 대체 (정보데이터시스템 통계간행물 자동 다운로드)
-- **대안 C**: pykrx Python 라이브러리를 별도 컨테이너로 실행 + Go에서 호출 (운영 부담 증가)
+**채택된 패턴**:
+- **종목 마스터**: KIND 공개 다운로드 (`https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=stockMkt`) — EUC-KR HTML 테이블 (839개 KOSPI + KOSDAQ별도)
+- **OHLCV·시세**: Yahoo Finance + `.KS`/`.KQ` 접미사 (예: `005930.KS` = 삼성전자, `247540.KQ` = 에코프로비엠). `piquette/finance-go` (Task 7) 라이브러리로 통합 — KR/US 단일 어댑터.
 
-아래 코드는 **spike에서 패턴이 확인된 후 보정**할 초안. v1보다 정확하지만 라이브 검증 안 됨.
+**왜 이 선택인가 (CTO)**:
+- Naver siseJson은 동작하지만 ToS 회색지대 (spec §1 "회색지대 금지" 위반 가능성)
+- KIS Open API는 사용자 계좌 등록 필요 (Phase 3)
+- Yahoo는 공식 지원, 단일 라이브러리 통합, 15분 지연 (spec과 정합), Rate limit MVP 규모 안전
+- pykrx sidecar는 Naver 의존 + Python 컨테이너 운영 부담
 
-**핵심 변경 의도 (v1 → v2)**: Referer 헤더 + ISIN(KR7XXXXXXXXX) 사용. `MDCSTAT01901`(종목 마스터)는 short symbol+ISIN 둘 다 반환하므로 마스터 호출에서 받은 `ISU_CD`를 캐시.
+**의도된 비범위**: KRX 데이터 (호가·체결·외인보유 등 세부)는 v2 (Phase 3 KIS API 도입 시) 검토.
 
-**Files:** `apps/api/internal/sources/krx/krx.go`, `krx_test.go`
+**Files:** `apps/api/internal/sources/kind/kind.go`, `kind_test.go`
 
-- [ ] **Step 1: 어댑터 (Referer + ISIN)**
+- [ ] **Step 1: 의존성 (EUC-KR + HTML 파싱)**
+
+```bash
+cd /Users/yuhojin/Desktop/finance/apps/api
+go get golang.org/x/net/html
+go get golang.org/x/text/encoding/korean
+go get golang.org/x/text/transform
+```
+
+- [ ] **Step 2: KIND 어댑터 (종목 마스터만)**
 
 ```go
-package krx
+package kind
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
+	"golang.org/x/text/encoding/korean"
+	"golang.org/x/text/transform"
 
 	"github.com/quotient/quotient/apps/api/internal/models"
 	"github.com/quotient/quotient/apps/api/internal/sources/common"
 )
 
-const dataURL = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
+const baseURL = "https://kind.krx.co.kr/corpgeneral/corpList.do"
 
 type Client struct {
-	baseURL string
-	http    *http.Client
+	url  string
+	http *http.Client
 }
 
-func NewClient(baseURL string) *Client {
-	if baseURL == "" { baseURL = dataURL }
-	return &Client{baseURL: baseURL, http: &http.Client{Timeout: 30 * time.Second}}
+func NewClient(url string) *Client {
+	if url == "" { url = baseURL }
+	return &Client{url: url, http: &http.Client{Timeout: 30 * time.Second}}
 }
 
-// FetchInstruments returns all listings on the market. market: "KOSPI" | "KOSDAQ".
-// 응답에 short symbol(`ISU_SRT_CD`) + ISIN(`ISU_CD`) + 이름(`ISU_ABBRV`) 포함.
+// FetchInstruments returns KOSPI or KOSDAQ listings from KIND public HTML download.
+// market: "KOSPI" or "KOSDAQ".
+// KIND는 ISIN을 노출하지 않으므로 ISIN 필드는 nil. Yahoo는 short symbol + 접미사로 조회.
 func (c *Client) FetchInstruments(ctx context.Context, market string) ([]models.Instrument, error) {
-	form := url.Values{}
-	form.Set("bld", "dbms/MDC/STAT/standard/MDCSTAT01901")
-	form.Set("locale", "ko_KR")
-	form.Set("mktId", marketID(market))
-	form.Set("share", "1")
-	form.Set("csvxls_isNo", "false")
+	mt := "stockMkt"
+	if strings.EqualFold(market, "KOSDAQ") { mt = "kosdaqMkt" }
+	u := fmt.Sprintf("%s?method=download&searchType=13&marketType=%s", c.url, mt)
 
-	body, err := c.post(ctx, form, "https://data.krx.co.kr/contents/MDC/STAT/standard/MDCSTAT01901.cmd")
-	if err != nil { return nil, fmt.Errorf("krx instruments: %w", err) }
-
-	var p struct {
-		OutBlock1 []struct {
-			ISUSrtCd string `json:"ISU_SRT_CD"` // 005930
-			ISUCd    string `json:"ISU_CD"`     // KR7005930003 (ISIN)
-			ISUAbbrv string `json:"ISU_ABBRV"`
-		} `json:"OutBlock_1"`
-	}
-	if err := json.Unmarshal(body, &p); err != nil { return nil, fmt.Errorf("krx instruments parse: %w", err) }
-
-	out := make([]models.Instrument, 0, len(p.OutBlock1))
-	for _, r := range p.OutBlock1 {
-		isin := r.ISUCd
-		out = append(out, models.Instrument{
-			Symbol:     r.ISUSrtCd,
-			Exchange:   "KRX",
-			ISIN:       &isin,
-			Name:       r.ISUAbbrv,
-			AssetClass: models.AssetKRStock,
-			Currency:   "KRW",
-			IsActive:   true,
-		})
-	}
-	return out, nil
-}
-
-// FetchPrices: ISIN 필요. startYMD/endYMD: "YYYYMMDD".
-func (c *Client) FetchPrices(ctx context.Context, isin, startYMD, endYMD string) ([]models.PriceBar, error) {
-	if !strings.HasPrefix(isin, "KR") {
-		return nil, fmt.Errorf("krx prices requires ISIN (KR...): got %q", isin)
-	}
-	form := url.Values{}
-	form.Set("bld", "dbms/MDC/STAT/standard/MDCSTAT01701")
-	form.Set("locale", "ko_KR")
-	form.Set("isuCd", isin)
-	form.Set("strtDd", startYMD)
-	form.Set("endDd", endYMD)
-	form.Set("adjStkPrc_check", "Y")
-	form.Set("adjStkPrc", "2")
-	form.Set("share", "1")
-	form.Set("money", "1")
-	form.Set("csvxls_isNo", "false")
-
-	body, err := c.post(ctx, form, "https://data.krx.co.kr/contents/MDC/STAT/standard/MDCSTAT01701.cmd")
-	if err != nil { return nil, fmt.Errorf("krx prices: %w", err) }
-
-	var p struct {
-		Output []struct {
-			TrdDd    string `json:"TRD_DD"`
-			Open     string `json:"TDD_OPNPRC"`
-			High     string `json:"TDD_HGPRC"`
-			Low      string `json:"TDD_LWPRC"`
-			Close    string `json:"TDD_CLSPRC"`
-			Vol      string `json:"ACC_TRDVOL"`
-		} `json:"output"`
-	}
-	if err := json.Unmarshal(body, &p); err != nil { return nil, fmt.Errorf("krx prices parse: %w", err) }
-
-	out := make([]models.PriceBar, 0, len(p.Output))
-	for _, r := range p.Output {
-		date, err := time.Parse("2006/01/02", r.TrdDd)
-		if err != nil {
-			if date, err = time.Parse("2006-01-02", r.TrdDd); err != nil { continue }
-		}
-		out = append(out, models.PriceBar{
-			Date:   date,
-			Open:   parseNum(r.Open),
-			High:   parseNum(r.High),
-			Low:    parseNum(r.Low),
-			Close:  parseNum(r.Close),
-			Volume: parseInt(r.Vol),
-		})
-	}
-	return out, nil
-}
-
-func (c *Client) post(ctx context.Context, form url.Values, referer string) ([]byte, error) {
 	resp, err := common.DoWithBackoff(ctx, func() (*http.Response, error) {
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, bytes.NewBufferString(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Quotient/1.0)")
-		req.Header.Set("Referer", referer)  // 핵심: KRX는 Referer 없으면 빈 응답
-		req.Header.Set("X-Requested-With", "XMLHttpRequest")
 		return c.http.Do(req)
 	})
-	if err != nil { return nil, err }
+	if err != nil { return nil, fmt.Errorf("kind fetch: %w", err) }
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK { return nil, fmt.Errorf("krx HTTP %d", resp.StatusCode) }
-	buf := new(bytes.Buffer)
-	_, _ = buf.ReadFrom(resp.Body)
-	return buf.Bytes(), nil
+	if resp.StatusCode != http.StatusOK { return nil, fmt.Errorf("kind HTTP %d", resp.StatusCode) }
+
+	// EUC-KR → UTF-8 + HTML 파싱
+	utf8r := transform.NewReader(resp.Body, korean.EUCKR.NewDecoder())
+	doc, err := html.Parse(utf8r)
+	if err != nil { return nil, fmt.Errorf("kind html parse: %w", err) }
+
+	return parseKindTable(doc, market), nil
 }
 
-func marketID(name string) string {
-	switch strings.ToUpper(name) {
-	case "KOSPI": return "STK"
-	case "KOSDAQ": return "KSQ"
-	default: return ""
+// parseKindTable walks <tbody><tr><td> rows. KIND 컬럼 순서:
+// 0=회사명 1=시장구분 2=종목코드 3=업종 4=주요제품 5=상장일 ...
+func parseKindTable(doc *html.Node, market string) []models.Instrument {
+	var out []models.Instrument
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "tr" {
+			tds := []string{}
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				if c.Type == html.ElementNode && c.Data == "td" {
+					tds = append(tds, textOf(c))
+				}
+			}
+			if len(tds) >= 6 {
+				symbol := strings.TrimSpace(tds[2])
+				// 종목코드 6자리 검증
+				if len(symbol) == 6 {
+					out = append(out, models.Instrument{
+						Symbol:     symbol,
+						Exchange:   "KRX",
+						Name:       strings.TrimSpace(tds[0]),
+						AssetClass: models.AssetKRStock,
+						Currency:   "KRW",
+						IsActive:   true,
+					})
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling { walk(c) }
 	}
+	walk(doc)
+	return out
 }
 
-func parseNum(s string) float64 { v, _ := strconv.ParseFloat(strings.ReplaceAll(s, ",", ""), 64); return v }
-func parseInt(s string) int64 { v, _ := strconv.ParseInt(strings.ReplaceAll(s, ",", ""), 10, 64); return v }
+func textOf(n *html.Node) string {
+	if n.Type == html.TextNode { return n.Data }
+	var b strings.Builder
+	for c := n.FirstChild; c != nil; c = c.NextSibling { b.WriteString(textOf(c)) }
+	return b.String()
+}
+
+// (헬퍼 함수 io는 미사용 — import 정리)
+var _ = io.Discard
 ```
 
-- [ ] **Step 2: 테스트 (mock 서버, Referer + ISIN 검증)**
+- [ ] **Step 3: 테스트 (mock HTML 픽스처)**
 
 ```go
-package krx
-// (이전 v1 테스트 패턴과 동일하되 ISIN 사용 + Referer 헤더 assert)
-```
+package kind
 
-- [ ] **Step 3: 실제 KRX 호출 통합 테스트 (-tags integration)**
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 
-```go
-//go:build integration
-package krx
-// 실제 data.krx.co.kr 호출. KOSPI 상위 종목 5개 fetch + 1주 일봉.
-// CI에서 default off (TLS·외부 호출 의존)
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const sampleHTML = `<!DOCTYPE html>
+<html><body><table><tbody>
+<tr><td>삼성전자</td><td>코스피</td><td>005930</td><td>전기·전자</td><td>반도체</td><td>1975-06-11</td></tr>
+<tr><td>SK하이닉스</td><td>코스피</td><td>000660</td><td>전기·전자</td><td>메모리</td><td>1996-12-26</td></tr>
+</tbody></table></body></html>`
+
+func TestFetchInstruments_ParsesHTML(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.RawQuery, "marketType=stockMkt")
+		// EUC-KR로 인코딩되지 않은 UTF-8 응답 — 디코더가 ASCII 통과시키므로 OK
+		w.Header().Set("Content-Type", "text/html; charset=euc-kr")
+		_, _ = w.Write([]byte(sampleHTML))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	inst, err := c.FetchInstruments(context.Background(), "KOSPI")
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(inst), 2)
+	assert.Equal(t, "005930", inst[0].Symbol)
+	assert.Equal(t, "삼성전자", inst[0].Name)
+}
 ```
 
 - [ ] **Step 4: 빌드·테스트·커밋**
 
 ```bash
 cd /Users/yuhojin/Desktop/finance/apps/api
-go mod tidy && go test ./internal/sources/krx/...
+go mod tidy && go test ./internal/sources/kind/...
 git -C /Users/yuhojin/Desktop/finance add apps/api/
-git -C /Users/yuhojin/Desktop/finance commit -m "feat(api): KRX 어댑터 (Referer + ISIN, 백오프 적용)"
+git -C /Users/yuhojin/Desktop/finance commit -m "feat(api): KIND 어댑터 (KR 종목 마스터 HTML 다운로드, EUC-KR)"
 ```
+
+> KR OHLCV·시세는 Task 7 (Yahoo)에서 `.KS`/`.KQ` 접미사로 통합 처리.
 
 ---
 
-## Task 7: Yahoo Finance 어댑터 (`piquette/finance-go` 채택)
+## Task 7: Yahoo Finance 어댑터 (KR + US 통합)
 
-**핵심**: crumb·쿠키를 라이브러리가 자동 처리. 직접 HTTP 호출 X.
+**핵심**: crumb·쿠키를 piquette/finance-go가 자동 처리. KR 종목은 `005930.KS` (KOSPI) / `247540.KQ` (KOSDAQ) 형태 접미사 사용. US 종목은 접미사 없음.
+
+**Symbol 변환 helper**:
+- `005930` + `KOSPI` → `005930.KS`
+- `005930` + `KOSDAQ` → `005930.KQ`
+- `AAPL` + `NASDAQ` → `AAPL`
+
+이 변환은 ingest 단계에서 instrument 행을 만들 때 또는 fetch 호출 시 처리.
 
 **Files:** `apps/api/internal/sources/yahoo/yahoo.go`, `yahoo_test.go`
 
@@ -1181,5 +1175,6 @@ W2b plan은 W2a 완료 후 별도 작성·검토 사이클.
 - 2026-05-22 v2 subagent 재검토 → READY WITH PATCHES (Critical 3건 발견·반영).
   - Yahoo `chart.GetParams` → `chart.Get` 수정 + `Float64()` 2개 반환 처리 (Task 7).
   - frankfurter.app → frankfurter.dev (redirect 회피) (Task 8).
-  - **KRX 실제 호출이 LOGOUT 반환 확인** → Task 6에 spike 단계 명시. spike 결과에 따라 OTP 흐름·KIS API·ZIP 다운로드 등 대안 채택 필요.
-- 다음: 사용자 승인 → KRX spike → 본격 실행.
+  - **KRX 실제 호출이 LOGOUT 반환 확인** → Task 6에 spike 단계 명시.
+- 2026-05-22 KRX spike 완료 (agent a34a0c6). KRX 직접 호출 불가 (전 엔드포인트 로그인 벽). **결정: KR 데이터 단일화** — KIND (종목 마스터, 공개 HTML) + Yahoo (`.KS`/`.KQ`, 시세). Naver 시세 회색지대 회피. Task 6 KRX → KIND로 재작성.
+- 다음: 사용자 승인 → 실행.
