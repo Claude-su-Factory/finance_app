@@ -11,10 +11,16 @@ export default function LandingPage() {
           한국·미국 자산을 한 화면에. 자연어로 묻고, 즉시 분석을 받으세요.
         </p>
         <div className="flex gap-3">
-          <Link href="/signup" className="px-6 py-2 bg-bb-accent text-bg font-mono">
+          <Link
+            href="/signup"
+            className="px-6 py-2 bg-bb-accent text-bg font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bb-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
             가입하기
           </Link>
-          <Link href="/login" className="px-6 py-2 border border-line font-mono">
+          <Link
+            href="/login"
+            className="px-6 py-2 border border-line font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bb-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
             로그인
           </Link>
         </div>

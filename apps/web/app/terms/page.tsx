@@ -1,3 +1,8 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+export const metadata: Metadata = { title: "서비스 약관 — Quotient" };
+
 export default function Terms() {
   return (
     <main className="min-h-screen p-12 max-w-3xl mx-auto">
@@ -15,6 +20,11 @@ export default function Terms() {
 
       <h2 className="font-mono text-xl mt-8 mb-2">계정·해지</h2>
       <p className="text-fg">사용자는 언제든 설정에서 계정을 삭제할 수 있습니다. 삭제 시 모든 데이터가 즉시 파기됩니다 (결제 기록 제외).</p>
+
+      <footer className="border-t border-line mt-12 pt-4 text-fg-muted text-xs flex items-center justify-between">
+        <span>투자 자문이 아닙니다. 모든 의사결정은 본인 책임입니다.</span>
+        <Link href="/" className="underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bb-accent">홈으로</Link>
+      </footer>
     </main>
   );
 }

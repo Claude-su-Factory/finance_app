@@ -1,3 +1,8 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+export const metadata: Metadata = { title: "가격 — Quotient" };
+
 export default function Pricing() {
   return (
     <main className="min-h-screen p-12">
@@ -12,6 +17,10 @@ export default function Pricing() {
           <li>· 한국·미국 시세 (15분 지연)</li>
         </ul>
       </div>
+      <footer className="border-t border-line mt-12 pt-4 text-fg-muted text-xs flex items-center justify-between">
+        <span>투자 자문이 아닙니다. 모든 의사결정은 본인 책임입니다.</span>
+        <Link href="/" className="underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bb-accent">홈으로</Link>
+      </footer>
     </main>
   );
 }

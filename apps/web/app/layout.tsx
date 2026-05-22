@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
+import "pretendard/dist/web/variable/pretendardvariable.css";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
