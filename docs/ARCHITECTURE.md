@@ -87,10 +87,10 @@ graph TB
 - 한국·미국 실시간(Tick) 시세는 개인이 무료로 정식 확보 불가. 회색지대 스크래핑은 법·운영 리스크. 15분 지연 공개 데이터로 충분 (타겟이 데이트레이더가 아니라 분석가).
 
 **How**:
-- Go 단일 바이너리에 Echo/Chi + `robfig/cron` 동거.
-- 외부 소스: KRX 공식 다운로드, Yahoo Finance (`piquette/finance-go`), FRED, 한국은행 ECOS, `exchangerate.host`.
+- Go 단일 바이너리에 chi + `robfig/cron/v3 (SkipIfStillRunning)` 동거. 6 잡: instruments·KR prices·US prices·index quotes(60s TTL)·FX·indicators.
+- 외부 소스: KIND 공개 HTML (KR 종목 마스터, KRX 직접 호출 차단), Yahoo Finance (`piquette/finance-go`, KR `.KS/.KQ` + US 통합 + 지수 `^KS11/^GSPC` 등), FRED, 한국은행 ECOS, frankfurter.dev (USD→KRW/EUR/JPY, exchangerate.host 유료화로 교체).
 - KIS Open API는 Phase 3에서 사용자 본인 키 등록 시 활성화.
-- 실패 시 지수 백오프 5회 → 누적 3회 실패 시 잡 정지 + 알림.
+- 실패 시 지수 백오프 5회 (`internal/sources/common/backoff.go`). 잡 단위 부분 적재 허용 (개별 종목 실패 skip + 다음 cron 재시도). 누적 3회 실패 시 Resend 알림은 W5 백로그.
 
 **Trade-off**: 15분 지연은 단타·스캘핑 사용자에게 부적합. → 명시적 비타겟. UI에 "지연 15분" 표기로 기대치 정렬.
 
