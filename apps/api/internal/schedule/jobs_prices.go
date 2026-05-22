@@ -82,7 +82,9 @@ func updateDailyByExchange(ctx context.Context, d Deps, exchanges ...string) err
 
 // yahooSymbolForExchange는 W2a의 yahoo.SymbolKR을 활용. KRX → .KS/.KQ는
 // 정확한 KOSPI/KOSDAQ 시장 구분 필요. 현재 instruments.exchange는 'KRX' 단일이라
-// 시장 정보 부재 → KOSPI(.KS) 기본 + 실패 시 .KQ 재시도.
+// 시장 정보 부재 → KOSPI(.KS) 기본만 시도. KOSDAQ 종목은 silently skip
+// (cron이 매일 재시도하므로 데이터 손실 ≠ 잡 누적 실패). backfill CLI는
+// -market 인자로 명시 구분. W3에서 instruments.market 컬럼 추가 검토 (백로그).
 func yahooSymbolForExchange(symbol, exchange string) string {
 	switch exchange {
 	case "KRX":
