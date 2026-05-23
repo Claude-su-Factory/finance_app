@@ -56,3 +56,9 @@ func RawJWT(ctx context.Context) string {
 	}
 	return ""
 }
+
+// WithUserID는 테스트·미들웨어 외 경로에서 사용자 ID를 ctx에 주입.
+// 프로덕션 코드는 RequireAuth 미들웨어가 이미 주입하므로 호출하지 않는다.
+func WithUserID(ctx context.Context, uid string) context.Context {
+	return context.WithValue(ctx, UserIDKey, uid)
+}
