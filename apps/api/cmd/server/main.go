@@ -52,6 +52,10 @@ func main() {
 	marketHandler := handlers.NewMarketHandler(marketRepo)
 	instrumentRepo := handlers.NewPgInstrumentRepo(pool)
 	instrumentHandler := handlers.NewInstrumentHandler(instrumentRepo)
+	holdingRepo := handlers.NewPgHoldingRepo(pool)
+	holdingHandler := handlers.NewHoldingHandler(holdingRepo, pool)
+	watchlistRepo := handlers.NewPgWatchlistRepo(pool)
+	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo)
 	readyz := handlers.ReadyzHandler(pool)
 
 	// cron 워커 시작
@@ -66,7 +70,12 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           router.New(verifier, cfg.CORSOrigin, profileHandler, marketHandler, instrumentHandler, readyz),
+		Handler: router.New(
+			verifier, cfg.CORSOrigin,
+			profileHandler, marketHandler, instrumentHandler,
+			holdingHandler, watchlistHandler,
+			readyz,
+		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

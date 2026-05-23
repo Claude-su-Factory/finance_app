@@ -15,6 +15,8 @@ func New(
 	profileHandler *handlers.ProfileHandler,
 	marketHandler *handlers.MarketHandler,
 	instrumentHandler *handlers.InstrumentHandler,
+	holdingHandler *handlers.HoldingHandler,
+	watchlistHandler *handlers.WatchlistHandler,
 	readyz http.HandlerFunc,
 ) *chi.Mux {
 	r := chi.NewRouter()
@@ -29,6 +31,15 @@ func New(
 		r.Get("/v1/market/ticker", marketHandler.Ticker)
 		r.Get("/v1/instruments/search", instrumentHandler.Search)
 		r.Post("/v1/instruments/select", instrumentHandler.Select)
+
+		r.Get("/v1/holdings", holdingHandler.List)
+		r.Post("/v1/holdings", holdingHandler.Create)
+		r.Patch("/v1/holdings/{id}", holdingHandler.Patch)
+		r.Delete("/v1/holdings/{id}", holdingHandler.Delete)
+
+		r.Get("/v1/watchlist", watchlistHandler.List)
+		r.Post("/v1/watchlist", watchlistHandler.Add)
+		r.Delete("/v1/watchlist/{instrument_id}", watchlistHandler.Remove)
 	})
 
 	return r
