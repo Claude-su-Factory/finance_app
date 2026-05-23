@@ -1,10 +1,10 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-22
+마지막 업데이트: 2026-05-23
 
 ## 현재 Phase
 
-**Phase 1 — W1·W2a·W2b 완료. W3 (포트폴리오·watchlist) 작성 대기.**
+**Phase 1 — W1·W2a·W2b·W3 완료. W4 (AI 채팅) 작성 대기.**
 
 ## 진행 중
 
@@ -12,7 +12,6 @@
 - [ ] W1-T14 Fly + Vercel 배포 (외부 계정 필요)
 - [ ] W1-T15 GitHub Actions CI/CD (외부 토큰 필요)
 - [ ] W1-T16 통합 동작 검증 (W2b·W3+ 후 풀 E2E — W2b 런타임 검증 11항 plan §Task 14 참조)
-- [ ] W3 plan 작성 (포트폴리오 holdings + watchlist + 홈 대시보드 + IndexQuotes polling 확장)
 
 ## Phase 0 스펙 섹션 (완료, 참고용)
 
@@ -56,6 +55,22 @@
 - ✅ W2b-T9·10·11 마켓 API (/v1/market/ticker, /v1/instruments/search·select) + cron 워커 main.go 통합 (`a6f75e0`)
 - ✅ W2b-T12 TopTicker 실데이터 + visibility skip (`951690c`)
 - ✅ W2b-T13 5년 백필 CLI (cmd/backfill) (`d2c24e3`)
+- ✅ W3-T1 holdings + watchlist 마이그레이션 + RLS 7개 (`3dd1c97`)
+- ✅ W3-T1.5 middleware.WithUserID helper (`d52473b`)
+- ✅ W3-T2 holdings·watchlist 모델 (enriched 포함) (`17a61fa`)
+- ✅ W3-T3 FX 환산 helper (FetchFXRates + ToKRW) (`206ca94`)
+- ✅ W3-T4 holdings Postgres repo (`f0eae1e`)
+- ✅ W3-T5 holdings CRUD 핸들러 (검증 + asset_class 가드 + enrichment) (`5555aa6`)
+- ✅ W3-T6 watchlist 추가·삭제·조회 핸들러 (`2374614`)
+- ✅ W3-T7 holdings·watchlist 라우트 7개 등록 (`baa5d61`)
+- ✅ W3-T8 quotes 폴링 INDEX∪holdings∪watchlist 확장 + JobUpdateMarketQuotes rename (`d4698d4`)
+- ✅ W3-T9 web API 클라이언트(holdings·watchlist·instruments) + authFetch + 백엔드 search 응답 확장 (`993731c`, `6397a4d`)
+- ✅ W3-T10 포트폴리오 페이지 + 보유 테이블 (`a8ff34d`)
+- ✅ W3-T11 보유 자산 추가 모달 + 디바운스 종목 검색 (`7716edf`)
+- ✅ W3-T12 보유 자산 수정·삭제 모달 + 행 액션 (`6ca1f0b`)
+- ✅ W3-T13 홈 — 총자산 카운트업 + 자산 분포 도넛 (`683303b`)
+- ✅ W3-T14 홈 6카드 (상위5·마켓·관심종목·브리핑 placeholder) (`3fd3289`)
+- ✅ W3-T15 온보딩 wizard 3단계 (holdings 추가 + 세션 가드 + toast) (`61ea24a`)
 
 ## 알려진 결함 / 백로그
 
@@ -66,14 +81,18 @@
 - **stack 버전 변경**: Next.js 16.2.6 + Tailwind v4 (스펙은 15 + v3) — 최신 GA 수용, 스펙 문서 업데이트 필요
 - **Go 1.25 강제**: pgx/v5 v5.9.2가 Go 1.25 요구. Task 14 Dockerfile · Task 15 CI 모두 `golang:1.25-alpine` / `go-version: "1.25"` 사용 필요
 - **Supabase Auth JWT secret**: CLI v2.98이 legacy 키 노출 안 함. 사용자가 dashboard에서 "Legacy JWT Secret" 활성화 필요. JWKS 마이그레이션 백로그
-- **온보딩 단계 수**: 스펙 §6은 3단계, W1 구현은 2단계 (holdings API 미구현). W3에서 3단계로 복원 예정
 - **KOSDAQ 종목 cron 일봉 누락**: `JobUpdateKRPrices`가 `.KS` 기본만 시도. KOSDAQ 종목은 backfill CLI(`-market KOSDAQ`)로 별도 백필 후 cron이 일별 갱신 못 함. W3에서 `instruments.market` 컬럼 추가 검토
 - **US 장중 NY Friday 후반 세션 누락**: `IsUSMarketOpen`이 토요일 일괄 false. KST 토요일 새벽 NY Friday 정규장(quotes 분 단위 폴링) skip. 일봉(prices)은 06:00 cron이 별도 처리 → 데이터 손실 없음
 - **US 장중 DST 미반영**: KST 23:30~06:00 고정. 미국 일광절약시간 기간 30분 어긋남
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
+- **FX 환율 EUR/JPY 미적재**: `JobUpdateFXRates`가 rateMap key `USD_EUR`/`USD_JPY` 생성하나 instrument symbol은 `EUR_KRW`/`JPY_KRW`라 매칭 실패. 결과: EUR/JPY 자산 보유 시 KRW 환산이 fallback 1.0 → 평가액 왜곡. MVP는 KR/US 자산 가정으로 W3 비범위 처리, W5 마켓 탭 작업 시 정리 예정 (`pricing.go` Warn 로그로 표면화)
+- **watchlist 추가 UI 부재**: 백엔드 API + 홈 미니카드 조회만 W3에 포함. 종목 추가/제거 UI는 W5 마켓 탭에서 제공 예정
+- **포트폴리오 미니 스파크라인 미구현**: 스펙 §6 보유 테이블의 종목별 7일 가격 sparkline은 Phase 1 후반(W5)로 미룸. recharts 도입 + prices 7일 조회 API 동시 작업
+- **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 위와 동일 시점
 
 ## 최근 변경 이력
 
+- 2026-05-23 W3 전체 완료. holdings·watchlist 마이그+CRUD API + asset_class 가드 + FX 환산 + cron polling union 확장(JobUpdateMarketQuotes rename) + 포트폴리오 페이지(CRUD 모달) + 홈 대시보드 6카드 + 온보딩 3단계 복원(세션 가드+toast).
 - 2026-05-22 W2b 전체 완료. cron 워커 6 잡(robfig/cron + SkipIfStillRunning) + 마켓 API 3 라우트 + TopTicker 실데이터 + 5년 백필 CLI. 시드 alias 자동 등록(§10-9) 포함. 알려진 한계: KOSDAQ .KS fallback, NY Friday session 누락, DST 미반영.
 - 2026-05-22 W2a 전체 (T1~T11) 완료. 4 마이그레이션 + 5 어댑터(KIND·Yahoo·FX·FRED·ECOS) + 백오프 + 6 모델 + ingest(Batch+COPY) + testcontainers. KRX 직접 호출 불가 확인 후 KIND+Yahoo 단일화.
 - 2026-05-22 W1-T11·T12 완료. 앱 셸 + 온보딩 wizard 2단계.
