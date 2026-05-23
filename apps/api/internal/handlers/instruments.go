@@ -9,10 +9,12 @@ import (
 )
 
 type SearchResult struct {
-	ID       string `json:"id"`
-	Symbol   string `json:"symbol"`
-	Exchange string `json:"exchange"`
-	Name     string `json:"name"`
+	ID         string `json:"id"`
+	Symbol     string `json:"symbol"`
+	Exchange   string `json:"exchange"`
+	Name       string `json:"name"`
+	Currency   string `json:"currency"`
+	AssetClass string `json:"asset_class"`
 }
 
 type InstrumentRepo interface {

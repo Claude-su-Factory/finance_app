@@ -18,7 +18,7 @@ func NewPgInstrumentRepo(pool *pgxpool.Pool) *PgInstrumentRepo {
 
 func (r *PgInstrumentRepo) SearchByAlias(ctx context.Context, query string) ([]SearchResult, error) {
 	rows, err := r.pool.Query(ctx, `
-		select i.id::text, i.symbol, i.exchange, i.name
+		select i.id::text, i.symbol, i.exchange, i.name, i.currency, i.asset_class
 		from public.instrument_aliases a
 		join public.instruments i on i.id = a.instrument_id
 		where a.alias = $1 and i.is_active = true
@@ -34,7 +34,7 @@ func (r *PgInstrumentRepo) SearchByAlias(ctx context.Context, query string) ([]S
 func (r *PgInstrumentRepo) SearchByText(ctx context.Context, query string) ([]SearchResult, error) {
 	pat := "%" + strings.ToLower(query) + "%"
 	rows, err := r.pool.Query(ctx, `
-		select id::text, symbol, exchange, name from public.instruments
+		select id::text, symbol, exchange, name, currency, asset_class from public.instruments
 		where (lower(name) like $1 or lower(symbol) like $1) and is_active = true
 		order by length(symbol) asc
 		limit 10
@@ -58,7 +58,7 @@ func scanResults(rows interface {
 	var out []SearchResult
 	for rows.Next() {
 		var s SearchResult
-		if err := rows.Scan(&s.ID, &s.Symbol, &s.Exchange, &s.Name); err != nil {
+		if err := rows.Scan(&s.ID, &s.Symbol, &s.Exchange, &s.Name, &s.Currency, &s.AssetClass); err != nil {
 			return nil, err
 		}
 		out = append(out, s)
