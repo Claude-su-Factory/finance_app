@@ -5,6 +5,8 @@ import { listHoldings, type Holding } from "@/lib/api/holdings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AddHoldingDialog } from "./AddHoldingDialog";
+import { EditHoldingDialog } from "./EditHoldingDialog";
+import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 
 type SortKey = "weight_pct" | "market_value_krw" | "pnl_pct" | "symbol";
 
@@ -14,6 +16,10 @@ export function HoldingsTable() {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("weight_pct");
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Holding | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Holding | null>(null);
 
   async function load() {
     try {
@@ -112,7 +118,14 @@ export function HoldingsTable() {
                     </td>
                     <td className="text-right px-3 py-2">{h.weight_pct.toFixed(1)}%</td>
                     <td className="px-3 py-2 text-right">
-                      {/* 수정/삭제는 W3-T12 */}
+                      <button
+                        onClick={() => { setEditTarget(h); setEditOpen(true); }}
+                        className="text-xs text-fg-muted hover:text-fg mr-2"
+                      >수정</button>
+                      <button
+                        onClick={() => { setDeleteTarget(h); setDeleteOpen(true); }}
+                        className="text-xs text-fg-muted hover:text-bb-down"
+                      >삭제</button>
                     </td>
                   </tr>
                 ))}
@@ -122,6 +135,8 @@ export function HoldingsTable() {
         </div>
       )}
       <AddHoldingDialog open={addOpen} onOpenChange={setAddOpen} onAdded={() => void load()} />
+      <EditHoldingDialog holding={editTarget} open={editOpen} onOpenChange={setEditOpen} onSaved={() => void load()} />
+      <DeleteConfirmDialog holding={deleteTarget} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => void load()} />
     </>
   );
 }
