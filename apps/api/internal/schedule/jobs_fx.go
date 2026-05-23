@@ -30,6 +30,16 @@ func JobUpdateFXRates(ctx context.Context, d Deps) error {
 	for _, r := range rates {
 		rateMap[fmt.Sprintf("%s_%s", r.Base, r.Quote)] = r.Rate
 	}
+	// frankfurter는 base=USD로 USD→{KRW,EUR,JPY}만 반환하므로 EUR_KRW/JPY_KRW는 derived 계산.
+	// EUR_KRW = USD_KRW / USD_EUR, JPY_KRW = USD_KRW / USD_JPY.
+	if usdKRW, ok := rateMap["USD_KRW"]; ok && usdKRW > 0 {
+		if usdEUR, ok := rateMap["USD_EUR"]; ok && usdEUR > 0 {
+			rateMap["EUR_KRW"] = usdKRW / usdEUR
+		}
+		if usdJPY, ok := rateMap["USD_JPY"]; ok && usdJPY > 0 {
+			rateMap["JPY_KRW"] = usdKRW / usdJPY
+		}
+	}
 
 	type instRow struct{ id, symbol string }
 	rs, err := d.Pool.Query(ctx, `
@@ -43,6 +53,15 @@ func JobUpdateFXRates(ctx context.Context, d Deps) error {
 
 	var quotes []models.Quote
 	prevRates := previousRates(ctx, d, time.Now().UTC())
+	// prev에도 동일 derived 계산 적용 (EUR_KRW/JPY_KRW change_pct 정상화)
+	if usdKRW, ok := prevRates["USD_KRW"]; ok && usdKRW > 0 {
+		if usdEUR, ok := prevRates["USD_EUR"]; ok && usdEUR > 0 {
+			prevRates["EUR_KRW"] = usdKRW / usdEUR
+		}
+		if usdJPY, ok := prevRates["USD_JPY"]; ok && usdJPY > 0 {
+			prevRates["JPY_KRW"] = usdKRW / usdJPY
+		}
+	}
 	for rs.Next() {
 		var r instRow
 		if err := rs.Scan(&r.id, &r.symbol); err != nil {

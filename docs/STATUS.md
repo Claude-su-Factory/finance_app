@@ -85,13 +85,13 @@
 - **US 장중 NY Friday 후반 세션 누락**: `IsUSMarketOpen`이 토요일 일괄 false. KST 토요일 새벽 NY Friday 정규장(quotes 분 단위 폴링) skip. 일봉(prices)은 06:00 cron이 별도 처리 → 데이터 손실 없음
 - **US 장중 DST 미반영**: KST 23:30~06:00 고정. 미국 일광절약시간 기간 30분 어긋남
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
-- **FX 환율 EUR/JPY 미적재**: `JobUpdateFXRates`가 rateMap key `USD_EUR`/`USD_JPY` 생성하나 instrument symbol은 `EUR_KRW`/`JPY_KRW`라 매칭 실패. 결과: EUR/JPY 자산 보유 시 KRW 환산이 fallback 1.0 → 평가액 왜곡. MVP는 KR/US 자산 가정으로 W3 비범위 처리, W5 마켓 탭 작업 시 정리 예정 (`pricing.go` Warn 로그로 표면화)
 - **watchlist 추가 UI 부재**: 백엔드 API + 홈 미니카드 조회만 W3에 포함. 종목 추가/제거 UI는 W5 마켓 탭에서 제공 예정
 - **포트폴리오 미니 스파크라인 미구현**: 스펙 §6 보유 테이블의 종목별 7일 가격 sparkline은 Phase 1 후반(W5)로 미룸. recharts 도입 + prices 7일 조회 API 동시 작업
 - **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 위와 동일 시점
 
 ## 최근 변경 이력
 
+- 2026-05-23 W3 후속 FX fix. `jobs_fx.go`에 EUR_KRW/JPY_KRW derived 계산 추가 (USD_KRW / USD_EUR, USD_KRW / USD_JPY). prev rates에도 동일 적용으로 change_pct 정상화. holdings KRW 환산 정확도 회복.
 - 2026-05-23 W3 전체 완료. holdings·watchlist 마이그+CRUD API + asset_class 가드 + FX 환산 + cron polling union 확장(JobUpdateMarketQuotes rename) + 포트폴리오 페이지(CRUD 모달) + 홈 대시보드 6카드 + 온보딩 3단계 복원(세션 가드+toast).
 - 2026-05-22 W2b 전체 완료. cron 워커 6 잡(robfig/cron + SkipIfStillRunning) + 마켓 API 3 라우트 + TopTicker 실데이터 + 5년 백필 CLI. 시드 alias 자동 등록(§10-9) 포함. 알려진 한계: KOSDAQ .KS fallback, NY Friday session 누락, DST 미반영.
 - 2026-05-22 W2a 전체 (T1~T11) 완료. 4 마이그레이션 + 5 어댑터(KIND·Yahoo·FX·FRED·ECOS) + 백오프 + 6 모델 + ingest(Batch+COPY) + testcontainers. KRX 직접 호출 불가 확인 후 KIND+Yahoo 단일화.
