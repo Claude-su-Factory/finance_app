@@ -60,6 +60,10 @@ func (h *WatchlistHandler) Add(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "CONFLICT", "already in watchlist")
 			return
 		}
+		if errors.Is(err, ErrInstrumentRefMissing) {
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "instrument not found")
+			return
+		}
 		slog.Error("watchlist add failed", "user", uid, "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "add failed")
 		return

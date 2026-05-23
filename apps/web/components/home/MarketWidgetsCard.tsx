@@ -1,21 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { authFetch } from "@/lib/api/auth-fetch";
-
-type Ticker = {
-  symbol: string;
-  name: string;
-  price: number;
-  change_pct: number;
-};
+import { fetchTicker, type Ticker } from "@/lib/api/market";
 
 export function MarketWidgetsCard() {
   const [items, setItems] = useState<Ticker[]>([]);
   useEffect(() => {
-    authFetch("/v1/market/ticker")
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setItems)
-      .catch(() => {});
+    fetchTicker().then(setItems).catch(() => {});
   }, []);
   return (
     <div className="border border-line p-4">

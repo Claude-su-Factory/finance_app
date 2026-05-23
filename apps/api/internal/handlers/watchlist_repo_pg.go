@@ -11,6 +11,7 @@ import (
 
 var ErrWatchlistConflict = errors.New("watchlist item already exists")
 var ErrWatchlistNotFound = errors.New("watchlist item not found")
+var ErrInstrumentRefMissing = errors.New("referenced instrument not found")
 
 type WatchlistRepo interface {
 	List(ctx context.Context, userID string) ([]models.WatchlistItem, error)
@@ -58,8 +59,15 @@ func (r *PgWatchlistRepo) Add(ctx context.Context, userID, instrumentID string) 
 		insert into public.watchlist (user_id, instrument_id)
 		values ($1, $2)
 	`, userID, instrumentID)
-	if err != nil && strings.Contains(err.Error(), "23505") {
-		return ErrWatchlistConflict
+	if err != nil {
+		// PK 위반 → 이미 추가됨
+		if strings.Contains(err.Error(), "23505") {
+			return ErrWatchlistConflict
+		}
+		// FK 위반 → 존재하지 않는 instrument_id (잘못된 입력)
+		if strings.Contains(err.Error(), "23503") {
+			return ErrInstrumentRefMissing
+		}
 	}
 	return err
 }

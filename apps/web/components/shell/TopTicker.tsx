@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createSupabaseBrowser } from "@/lib/supabase/client";
 import { fetchTicker, type Ticker } from "@/lib/api/market";
 
 const SEED_DISPLAY = [
@@ -35,12 +34,7 @@ export function TopTicker() {
     async function load() {
       // 탭이 백그라운드면 호출 skip (배터리·API quota 절약)
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      const supabase = createSupabaseBrowser();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) return;
-      const data = await fetchTicker(session.access_token);
+      const data = await fetchTicker();
       if (!cancelled) setItems(data);
     }
 
