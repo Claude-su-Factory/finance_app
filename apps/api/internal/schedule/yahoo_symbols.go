@@ -16,3 +16,27 @@ func IndexYahooSymbol(symbol, exchange string) string {
 		return ""
 	}
 }
+
+// StockYahooSymbol은 일반 종목(KR_STOCK/US_STOCK/ETF)의 Yahoo 심볼을 반환.
+// KR: "005930" + "KOSPI" → "005930.KS", "KOSDAQ" → ".KQ"
+// US: 그대로
+// 미지 exchange는 "" 반환 → 호출자가 skip.
+func StockYahooSymbol(symbol, exchange string) string {
+	switch exchange {
+	case "KOSPI":
+		return symbol + ".KS"
+	case "KOSDAQ":
+		return symbol + ".KQ"
+	case "NYSE", "NASDAQ", "AMEX":
+		return symbol
+	}
+	return ""
+}
+
+func isKRExchange(ex string) bool {
+	return ex == "KOSPI" || ex == "KOSDAQ"
+}
+
+func isUSExchange(ex string) bool {
+	return ex == "NYSE" || ex == "NASDAQ" || ex == "AMEX"
+}

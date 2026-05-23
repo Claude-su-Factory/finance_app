@@ -51,9 +51,9 @@ func Start(ctx context.Context, d Deps) *cron.Cron {
 			slog.Error("cron us_prices failed", "err", err)
 		}
 	})
-	// quotes (INDEX 폴링) — 매분, 장중만
+	// quotes (INDEX∪holdings∪watchlist 폴링) — 매분, 장중만
 	mustAdd(c, "* * * * *", "quotes", func() {
-		if err := JobUpdateIndexQuotes(ctx, d); err != nil {
+		if err := JobUpdateMarketQuotes(ctx, d); err != nil {
 			slog.Error("cron quotes failed", "err", err)
 		}
 	})

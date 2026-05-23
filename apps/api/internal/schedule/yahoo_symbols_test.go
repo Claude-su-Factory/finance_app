@@ -19,3 +19,19 @@ func TestIndexYahooSymbol(t *testing.T) {
 		}
 	}
 }
+
+func TestStockYahooSymbol(t *testing.T) {
+	cases := []struct {
+		sym, ex, want string
+	}{
+		{"005930", "KOSPI", "005930.KS"},
+		{"035720", "KOSDAQ", "035720.KQ"},
+		{"AAPL", "NASDAQ", "AAPL"},
+		{"AAPL", "UNKNOWN", ""},
+	}
+	for _, c := range cases {
+		if got := StockYahooSymbol(c.sym, c.ex); got != c.want {
+			t.Errorf("StockYahooSymbol(%q,%q) = %q want %q", c.sym, c.ex, got, c.want)
+		}
+	}
+}
