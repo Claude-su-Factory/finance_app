@@ -11,6 +11,7 @@ type Config struct {
 	SentryDSN         string `env:"SENTRY_DSN_API"`
 	FREDAPIKey        string `env:"FRED_API_KEY"`
 	ECOSAPIKey        string `env:"ECOS_API_KEY"`
+	AnthropicAPIKey   string `env:"ANTHROPIC_API_KEY"`
 }
 
 func Load() (*Config, error) {
