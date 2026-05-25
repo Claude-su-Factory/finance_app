@@ -2,7 +2,9 @@
 
 ## 현재 추천 다음 작업
 
-W4 plan 작성 — AI 채팅(Claude tool use, 스트리밍, 사용량 추적). chat_sessions·chat_messages·chat_usage_monthly 마이그 + Claude API tool routing(§10-1 JWT 전파).
+W5 plan 작성 — 마켓 탭(`/app/market`). KR/US 지수·환율·경제 지표 카드 + 라인 차트(recharts 도입) + 관심 종목 추가/제거 UI. 광고 슬롯(`<AdSlot>`) 추상화 함께 검토.
+
+후속 backlog: AI RealClient 실 구현(`claude-api` 스킬), 포트폴리오 미니 스파크라인·sliding panel.
 
 ## Phase 0 — 스펙 (현재)
 
@@ -17,14 +19,13 @@ W4 plan 작성 — AI 채팅(Claude tool use, 스트리밍, 사용량 추적). c
 
 타겟: 5개 탭 (홈·포트폴리오·AI 채팅·마켓·설정). 수동 입력 + 공개 시세. **모두 무료 + 광고 슬롯 토글**. 결제는 비활성 (Phase 2 사업자 등록 시 활성화).
 
-완료(W1·W2a·W2b·W3 결과)는 [`STATUS.md`](STATUS.md)에서 확인. 남은 작업:
+완료(W1·W2a·W2b·W3·W4 결과)는 [`STATUS.md`](STATUS.md)에서 확인. 남은 작업:
 
 | Tier | 작업 | 예정 |
 |---|---|---|
-| 1 | AI 채팅 (Claude tool use, 스트리밍) | W4 |
 | 1 | 마켓 탭 (지수·환율·관심종목 페이지) | W5 |
 | 1 | `<AdSlot>` 컴포넌트 추상화 (`ENABLE_ADS=false` 기본) | W5 |
-| 2 | 일일 AI 브리핑 cron (§10-8 사용자별 분산) | W4 |
+| 1 | AI RealClient 실 구현 (anthropic-sdk-go) | W5·후속 |
 | 2 | 명령 팔레트 (⌘K) | Phase 1 후반 |
 | 3 | 키보드 단축키 풀세트 | Phase 1 후반 |
 

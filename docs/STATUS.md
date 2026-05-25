@@ -1,10 +1,10 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-23
+마지막 업데이트: 2026-05-25
 
 ## 현재 Phase
 
-**Phase 1 — W1·W2a·W2b·W3 완료. W4 (AI 채팅) 작성 대기.**
+**Phase 1 — W1·W2a·W2b·W3·W4 완료. W5 (마켓 탭) 작성 대기.**
 
 ## 진행 중
 
@@ -71,6 +71,22 @@
 - ✅ W3-T13 홈 — 총자산 카운트업 + 자산 분포 도넛 (`683303b`)
 - ✅ W3-T14 홈 6카드 (상위5·마켓·관심종목·브리핑 placeholder) (`3fd3289`)
 - ✅ W3-T15 온보딩 wizard 3단계 (holdings 추가 + 세션 가드 + toast) (`61ea24a`)
+- ✅ W4-T1 chat_*·ai_briefings 마이그+RLS 8 정책 (`3291bcc`)
+- ✅ W4-T2 ai.Client 인터페이스 + Event + chat·briefing 모델 (`f62bdc2`)
+- ✅ W4-T3 MockClient 8 시나리오 키워드 매핑 + 4 테스트 (`41c5178`)
+- ✅ W4-T4 RealClient stub + factory (env 자동 토글, anthropic-sdk-go) (`bd1f060`)
+- ✅ W4-T5 Tool Registry + ExecuteAndSerialize (정렬·error JSON) (`91c1fb7`)
+- ✅ W4-T6 9개 AI 도구 구현 (portfolio·quote·search) (`a5c4302`)
+- ✅ W4-T7 컨텍스트 관리 (최근 20 + placeholder) (`50cff9a`)
+- ✅ W4-T8 chat repo (세션·메시지·사용량 UPSERT + 한도 체크) (`68fa5f9`)
+- ✅ W4-T9 SSE 핸들러 + tool routing (turn별 메시지 묶음·max depth 8·session_id in done) (`56576aa`)
+- ✅ W4-T10 일일 브리핑 cron (사용자별 hash 분단위 분산 07:00~07:59) (`601bbfb`)
+- ✅ W4-T11 briefing 핸들러 + 라우트 6개 + AI client 와이어링 (`1fee649`)
+- ✅ W4-T12 chat·sessions·usage·briefing API 클라이언트 + SSE async generator (`5611439`)
+- ✅ W4-T13 채팅 페이지 골격 + 세션 리스트 + 라우팅 (`bb2d7f3`)
+- ✅ W4-T14 메시지·스트리밍·도구 인디케이터·입력·사용량 (`d54eac2`)
+- ✅ W4-T15 BriefingCard 실 API 연결 (`c4de6d2`)
+- ✅ W4-T16 SSE 끊김 처리 + 이어서 받기 (`a78c691`)
 
 ## 알려진 결함 / 백로그
 
@@ -88,9 +104,15 @@
 - **watchlist 추가 UI 부재**: 백엔드 API + 홈 미니카드 조회만 W3에 포함. 종목 추가/제거 UI는 W5 마켓 탭에서 제공 예정
 - **포트폴리오 미니 스파크라인 미구현**: 스펙 §6 보유 테이블의 종목별 7일 가격 sparkline은 Phase 1 후반(W5)로 미룸. recharts 도입 + prices 7일 조회 API 동시 작업
 - **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 위와 동일 시점
+- **AI RealClient 미구현**: anthropic-sdk-go 어댑터는 stub. 사용자가 ANTHROPIC_API_KEY 설정해도 stub error 반환. claude-api 스킬로 실 SDK 호출 코드 작성 필요 (별도 백로그). 빈 키일 때만 Mock으로 동작
+- **AI 컨텍스트 요약 미구현**: 20+ 메시지 시 placeholder만, Haiku 요약 부재. v2 검토
+- **일일 브리핑 도구 호출 없음**: MVP는 단순 1턴 호출. spec §10-8의 "보유 자산+어제 시세 입력"은 system prompt에 텍스트로만 — 도구 호출 통합은 v2
+- **사용량 토큰 turn-by-turn 누적 단순화**: 마지막 turn row에 누적 합계를 저장. turn별 분리 metrics는 v2
+- **disclaimer 강제 부착 system prompt 의존**: spec §5의 "(데이터 기준: ...)" 부착은 systemPrompt에만 명시. 핸들러 단 post-process 강제는 v2
 
 ## 최근 변경 이력
 
+- 2026-05-25 W4 전체 완료. AI 채팅 — Mock·Stub 클라이언트 + 9개 도구 + SSE 스트리밍(tool routing turn별 메시지 묶음, max depth 8, session_id in done) + 사용량 추적(월 30회·50K/10K·Opus 1회) + 일일 브리핑 cron(사용자 hash 분단위 분산) + 채팅 UI(세션 리스트·메시지·도구 인디케이터·입력·사용량 배지) + 끊김 처리(이어서 받기). dev에서 API 키 없이 Mock으로 전 흐름 검증 가능.
 - 2026-05-23 W3 후속 FX fix. `jobs_fx.go`에 EUR_KRW/JPY_KRW derived 계산 추가 (USD_KRW / USD_EUR, USD_KRW / USD_JPY). prev rates에도 동일 적용으로 change_pct 정상화. holdings KRW 환산 정확도 회복.
 - 2026-05-23 W3 전체 완료. holdings·watchlist 마이그+CRUD API + asset_class 가드 + FX 환산 + cron polling union 확장(JobUpdateMarketQuotes rename) + 포트폴리오 페이지(CRUD 모달) + 홈 대시보드 6카드 + 온보딩 3단계 복원(세션 가드+toast).
 - 2026-05-22 W2b 전체 완료. cron 워커 6 잡(robfig/cron + SkipIfStillRunning) + 마켓 API 3 라우트 + TopTicker 실데이터 + 5년 백필 CLI. 시드 alias 자동 등록(§10-9) 포함. 알려진 한계: KOSDAQ .KS fallback, NY Friday session 누락, DST 미반영.
