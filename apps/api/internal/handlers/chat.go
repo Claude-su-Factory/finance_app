@@ -326,6 +326,27 @@ func (h *ChatHandler) ListMessages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, msgs)
 }
 
+// GET /v1/chat/sessions/{id}/unfinished
+func (h *ChatHandler) GetUnfinished(w http.ResponseWriter, r *http.Request) {
+	uid := middleware.UserID(r.Context())
+	if uid == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	m, err := h.repo.UnfinishedInSession(r.Context(), uid, id)
+	if err != nil {
+		slog.Error("unfinished load failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
+		return
+	}
+	if m == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"unfinished": nil})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"unfinished": m})
+}
+
 // GET /v1/chat/usage
 func (h *ChatHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 	uid := middleware.UserID(r.Context())

@@ -47,6 +47,7 @@ func New(
 		r.Get("/v1/chat/sessions", chatHandler.ListSessions)
 		r.Delete("/v1/chat/sessions/{id}", chatHandler.DeleteSession)
 		r.Get("/v1/chat/sessions/{id}/messages", chatHandler.ListMessages)
+		r.Get("/v1/chat/sessions/{id}/unfinished", chatHandler.GetUnfinished)
 		r.Get("/v1/chat/usage", chatHandler.GetUsage)
 		r.Get("/v1/briefings/today", briefingHandler.Today)
 	})

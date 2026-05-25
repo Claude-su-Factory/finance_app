@@ -7,7 +7,8 @@ import { MessageList } from "./MessageList";
 import { InputBox } from "./InputBox";
 import { UsageBadge } from "./UsageBadge";
 import { streamChat } from "@/lib/api/chat";
-import { listMessages, type ChatMessage } from "@/lib/api/chat-sessions";
+import { listMessages, getUnfinished, type ChatMessage } from "@/lib/api/chat-sessions";
+import { ResumePrompt } from "./ResumePrompt";
 import type { ToolEvent } from "./StreamingMessage";
 
 export function ChatPage({ sessionId }: { sessionId: string | null }) {
@@ -17,14 +18,17 @@ export function ChatPage({ sessionId }: { sessionId: string | null }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionsKey, setSessionsKey] = useState(0);
   const [usageKey, setUsageKey] = useState(0);
+  const [unfinished, setUnfinished] = useState<ChatMessage | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     if (sessionId) {
       listMessages(sessionId).then(setMessages).catch(() => setMessages([]));
+      getUnfinished(sessionId).then(setUnfinished).catch(() => setUnfinished(null));
     } else {
       setMessages([]);
+      setUnfinished(null);
     }
     setStreamingText("");
     setToolEvents([]);
@@ -101,6 +105,17 @@ export function ChatPage({ sessionId }: { sessionId: string | null }) {
           <h1 className="font-mono text-sm">AI 분석가</h1>
           <UsageBadge refreshKey={usageKey} />
         </header>
+        {unfinished && (
+          <ResumePrompt
+            partial={unfinished.content}
+            onResume={() => {
+              const lastUser = [...messages].reverse().find((m) => m.role === "user");
+              if (lastUser) handleSend(lastUser.content, false);
+              setUnfinished(null);
+            }}
+            onDismiss={() => setUnfinished(null)}
+          />
+        )}
         <MessageList
           messages={messages}
           streamingText={streamingText}

@@ -37,3 +37,10 @@ export async function listMessages(sessionId: string): Promise<ChatMessage[]> {
   if (!res.ok) throw await readError(res);
   return res.json();
 }
+
+export async function getUnfinished(sessionId: string): Promise<ChatMessage | null> {
+  const res = await authFetch(`/v1/chat/sessions/${sessionId}/unfinished`);
+  if (!res.ok) throw await readError(res);
+  const data = await res.json();
+  return data.unfinished ?? null;
+}
