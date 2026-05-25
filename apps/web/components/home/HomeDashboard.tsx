@@ -7,7 +7,7 @@ import { AllocationDonut } from "./AllocationDonut";
 import { TopHoldingsCard } from "./TopHoldingsCard";
 import { MarketWidgetsCard } from "./MarketWidgetsCard";
 import { WatchlistMiniCard } from "./WatchlistMiniCard";
-import { BriefingPlaceholderCard } from "./BriefingPlaceholderCard";
+import { BriefingCard } from "./BriefingCard";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function HomeDashboard() {
@@ -32,7 +32,7 @@ export function HomeDashboard() {
       {/* 1행: 총자산 · 도넛 · 브리핑 */}
       <TotalAssetCard holdings={holdings} />
       <AllocationDonut holdings={holdings} />
-      <BriefingPlaceholderCard />
+      <BriefingCard />
       {/* 2행: 상위5 · 마켓 · 관심종목 */}
       <TopHoldingsCard holdings={holdings} />
       <MarketWidgetsCard />
