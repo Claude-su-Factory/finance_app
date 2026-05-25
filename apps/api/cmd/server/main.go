@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/ai/tools"
 	"github.com/quotient/quotient/apps/api/internal/auth"
 	"github.com/quotient/quotient/apps/api/internal/config"
 	"github.com/quotient/quotient/apps/api/internal/db"
@@ -56,6 +58,22 @@ func main() {
 	holdingHandler := handlers.NewHoldingHandler(holdingRepo, pool)
 	watchlistRepo := handlers.NewPgWatchlistRepo(pool)
 	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo)
+
+	// AI client (env에서 키 가져오기, 빈 값이면 Mock)
+	aiClient := ai.New(cfg.AnthropicAPIKey)
+
+	// Tool registry
+	toolRegistry := tools.NewRegistry()
+	toolDeps := &tools.Deps{Pool: pool}
+	tools.RegisterPortfolio(toolRegistry, toolDeps)
+	tools.RegisterQuote(toolRegistry, toolDeps)
+	tools.RegisterSearch(toolRegistry, toolDeps)
+
+	// Chat·Briefing handler
+	chatRepo := handlers.NewPgChatRepo(pool)
+	chatHandler := handlers.NewChatHandler(chatRepo, aiClient, toolRegistry)
+	briefingHandler := handlers.NewBriefingHandler(pool)
+
 	readyz := handlers.ReadyzHandler(pool)
 
 	// cron 워커 시작
@@ -66,7 +84,7 @@ func main() {
 		FX:    fx.NewClient(""),
 		FRED:  fred.NewClient("", cfg.FREDAPIKey),
 		ECOS:  ecos.NewClient("", cfg.ECOSAPIKey),
-	})
+	}, aiClient)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -74,6 +92,7 @@ func main() {
 			verifier, cfg.CORSOrigin,
 			profileHandler, marketHandler, instrumentHandler,
 			holdingHandler, watchlistHandler,
+			chatHandler, briefingHandler,
 			readyz,
 		),
 		ReadHeaderTimeout: 10 * time.Second,

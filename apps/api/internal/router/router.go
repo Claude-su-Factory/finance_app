@@ -17,6 +17,8 @@ func New(
 	instrumentHandler *handlers.InstrumentHandler,
 	holdingHandler *handlers.HoldingHandler,
 	watchlistHandler *handlers.WatchlistHandler,
+	chatHandler *handlers.ChatHandler,
+	briefingHandler *handlers.BriefingHandler,
 	readyz http.HandlerFunc,
 ) *chi.Mux {
 	r := chi.NewRouter()
@@ -40,6 +42,13 @@ func New(
 		r.Get("/v1/watchlist", watchlistHandler.List)
 		r.Post("/v1/watchlist", watchlistHandler.Add)
 		r.Delete("/v1/watchlist/{instrument_id}", watchlistHandler.Remove)
+
+		r.Post("/v1/chat", chatHandler.StreamChat)
+		r.Get("/v1/chat/sessions", chatHandler.ListSessions)
+		r.Delete("/v1/chat/sessions/{id}", chatHandler.DeleteSession)
+		r.Get("/v1/chat/sessions/{id}/messages", chatHandler.ListMessages)
+		r.Get("/v1/chat/usage", chatHandler.GetUsage)
+		r.Get("/v1/briefings/today", briefingHandler.Today)
 	})
 
 	return r
