@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { listHoldings, type Holding } from "@/lib/api/holdings";
+import { Sparkline } from "@/components/charts/Sparkline";
+import { fetchPriceHistoryBatch } from "@/lib/api/history";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AddHoldingDialog } from "./AddHoldingDialog";
@@ -20,15 +22,25 @@ export function HoldingsTable() {
   const [editTarget, setEditTarget] = useState<Holding | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Holding | null>(null);
+  const [sparks, setSparks] = useState<Record<string, { value: number }[]>>({});
 
   async function load() {
     try {
       const data = await listHoldings();
       setHoldings(data);
       setErr(null);
+      // 스파크라인 batch (7일)
+      const ids = data.map((h) => h.instrument_id);
+      if (ids.length > 0) {
+        const batch = await fetchPriceHistoryBatch(ids, "1w").catch(() => ({}));
+        const sp: Record<string, { value: number }[]> = {};
+        for (const [iid, points] of Object.entries(batch)) {
+          sp[iid] = points.map((p) => ({ value: p.close }));
+        }
+        setSparks(sp);
+      }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "로드 실패";
-      setErr(msg);
+      setErr((e as { message?: string })?.message ?? "로드 실패");
       setHoldings([]);
     }
   }
@@ -96,6 +108,7 @@ export function HoldingsTable() {
                   <th className="text-right px-3 py-2">손익 (KRW)</th>
                   <th className="text-right px-3 py-2">수익률</th>
                   <th className="text-right px-3 py-2">비중</th>
+                  <th className="text-right px-3 py-2">7일</th>
                   <th className="px-3 py-2"></th>
                 </tr>
               </thead>
@@ -117,6 +130,9 @@ export function HoldingsTable() {
                       {h.current_price > 0 ? `${h.pnl_pct.toFixed(2)}%` : "—"}
                     </td>
                     <td className="text-right px-3 py-2">{h.weight_pct.toFixed(1)}%</td>
+                    <td className="px-3 py-2">
+                      <Sparkline points={sparks[h.instrument_id] ?? []} width={70} height={20} />
+                    </td>
                     <td className="px-3 py-2 text-right">
                       <button
                         onClick={() => { setEditTarget(h); setEditOpen(true); }}
