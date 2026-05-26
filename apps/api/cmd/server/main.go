@@ -74,6 +74,9 @@ func main() {
 	chatHandler := handlers.NewChatHandler(chatRepo, aiClient, toolRegistry)
 	briefingHandler := handlers.NewBriefingHandler(pool)
 
+	historyRepo := handlers.NewPgHistoryRepo(pool)
+	historyHandler := handlers.NewHistoryHandler(historyRepo)
+
 	readyz := handlers.ReadyzHandler(pool)
 
 	// cron 워커 시작
@@ -93,6 +96,7 @@ func main() {
 			profileHandler, marketHandler, instrumentHandler,
 			holdingHandler, watchlistHandler,
 			chatHandler, briefingHandler,
+			historyHandler,
 			readyz,
 		),
 		ReadHeaderTimeout: 10 * time.Second,

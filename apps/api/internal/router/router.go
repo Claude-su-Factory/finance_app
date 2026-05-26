@@ -19,6 +19,7 @@ func New(
 	watchlistHandler *handlers.WatchlistHandler,
 	chatHandler *handlers.ChatHandler,
 	briefingHandler *handlers.BriefingHandler,
+	historyHandler *handlers.HistoryHandler,
 	readyz http.HandlerFunc,
 ) *chi.Mux {
 	r := chi.NewRouter()
@@ -50,6 +51,9 @@ func New(
 		r.Get("/v1/chat/sessions/{id}/unfinished", chatHandler.GetUnfinished)
 		r.Get("/v1/chat/usage", chatHandler.GetUsage)
 		r.Get("/v1/briefings/today", briefingHandler.Today)
+		r.Get("/v1/prices/history", historyHandler.Prices)
+		r.Get("/v1/indicators/history", historyHandler.Indicators)
+		r.Get("/v1/fx/history", historyHandler.Fx)
 	})
 
 	return r
