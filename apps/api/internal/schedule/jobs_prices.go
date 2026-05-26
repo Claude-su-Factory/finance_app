@@ -12,15 +12,15 @@ import (
 )
 
 // JobUpdateKRPrices fetches yesterday's daily bar for all active KRX instruments via Yahoo.
-// 매일 16:30 KST 실행.
+// 매일 16:30 KST 실행. KRX-IDX (KOSPI·KOSDAQ 인덱스) 포함.
 func JobUpdateKRPrices(ctx context.Context, d Deps) error {
-	return updateDailyByExchange(ctx, d, "KRX")
+	return updateDailyByExchange(ctx, d, "KRX", "KOSPI", "KOSDAQ", "KRX-IDX")
 }
 
 // JobUpdateUSPrices fetches yesterday's daily bar for all active US instruments via Yahoo.
-// 매일 06:00 KST 실행.
+// 매일 06:00 KST 실행. NYSE-IDX·NASDAQ-IDX (SPX·NDX 인덱스) 포함.
 func JobUpdateUSPrices(ctx context.Context, d Deps) error {
-	return updateDailyByExchange(ctx, d, "NASDAQ", "NYSE")
+	return updateDailyByExchange(ctx, d, "NASDAQ", "NYSE", "AMEX", "NYSE-IDX", "NASDAQ-IDX")
 }
 
 func updateDailyByExchange(ctx context.Context, d Deps, exchanges ...string) error {
@@ -56,6 +56,10 @@ func updateDailyByExchange(ctx context.Context, d Deps, exchanges ...string) err
 	var total int64
 	for _, s := range syms {
 		ysym := yahooSymbolForExchange(s.code, s.exchange)
+		if ysym == "" {
+			slog.Warn("no yahoo symbol mapping", "symbol", s.code, "exchange", s.exchange)
+			continue
+		}
 		bars, err := d.Yahoo.FetchChart(ctx, ysym, start, end)
 		if err != nil {
 			slog.Warn("yahoo skip", "symbol", ysym, "err", err)
@@ -80,16 +84,21 @@ func updateDailyByExchange(ctx context.Context, d Deps, exchanges ...string) err
 	return nil
 }
 
-// yahooSymbolForExchange는 W2a의 yahoo.SymbolKR을 활용. KRX → .KS/.KQ는
-// 정확한 KOSPI/KOSDAQ 시장 구분 필요. 현재 instruments.exchange는 'KRX' 단일이라
-// 시장 정보 부재 → KOSPI(.KS) 기본만 시도. KOSDAQ 종목은 silently skip
-// (cron이 매일 재시도하므로 데이터 손실 ≠ 잡 누적 실패). backfill CLI는
-// -market 인자로 명시 구분. W3에서 instruments.market 컬럼 추가 검토 (백로그).
+// yahooSymbolForExchange는 instruments.exchange에 따라 Yahoo 심볼을 반환.
+// IDX(인덱스) → IndexYahooSymbol(^KS11 등). 일반 종목 → StockYahooSymbol(.KS/.KQ 또는 plain).
+// 미지 exchange는 빈 문자열 반환 → 호출자 skip.
 func yahooSymbolForExchange(symbol, exchange string) string {
-	switch exchange {
-	case "KRX":
-		return yahoo.SymbolKR(symbol, "KOSPI") // .KS suffix
-	default:
-		return symbol // NASDAQ, NYSE는 plain
+	// 인덱스 우선
+	if idx := IndexYahooSymbol(symbol, exchange); idx != "" {
+		return idx
 	}
+	// 일반 종목
+	if stk := StockYahooSymbol(symbol, exchange); stk != "" {
+		return stk
+	}
+	// KRX(단일 exchange) → KOSPI 기본 (legacy)
+	if exchange == "KRX" {
+		return yahoo.SymbolKR(symbol, "KOSPI")
+	}
+	return ""
 }
