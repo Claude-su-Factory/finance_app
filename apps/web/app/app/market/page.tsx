@@ -3,6 +3,7 @@ import { USIndicesCard } from "@/components/market/USIndicesCard";
 import { FxCard } from "@/components/market/FxCard";
 import { IndicatorsCard } from "@/components/market/IndicatorsCard";
 import { AdSlot } from "@/components/ads/AdSlot";
+import { WatchlistEditorCard } from "@/components/market/WatchlistEditorCard";
 
 export default function MarketPage() {
   return (
@@ -25,7 +26,7 @@ export default function MarketPage() {
         <IndicatorsCard code="DFF" title="Fed Funds Rate" unit="%" />
         <IndicatorsCard code="DGS10" title="US 10Y Treasury" unit="%" />
         <IndicatorsCard code="722Y001" title="BOK 기준금리" unit="%" />
-        {/* WatchlistEditorCard는 W5-T6에서 추가 */}
+        <WatchlistEditorCard />
       </div>
     </div>
   );

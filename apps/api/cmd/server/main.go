@@ -57,7 +57,7 @@ func main() {
 	holdingRepo := handlers.NewPgHoldingRepo(pool)
 	holdingHandler := handlers.NewHoldingHandler(holdingRepo, pool)
 	watchlistRepo := handlers.NewPgWatchlistRepo(pool)
-	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo)
+	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo, pool)
 
 	// AI client (env에서 키 가져오기, 빈 값이면 Mock)
 	aiClient := ai.New(cfg.AnthropicAPIKey)

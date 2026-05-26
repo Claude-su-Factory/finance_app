@@ -27,24 +27,43 @@ func (f *fakeWatchlistRepo) Remove(ctx context.Context, userID, instrumentID str
 	return f.removeErr
 }
 
-func TestWatchlistAdd_Conflict(t *testing.T) {
-	repo := &fakeWatchlistRepo{addErr: ErrWatchlistConflict}
-	h := NewWatchlistHandler(repo)
-	body := `{"instrument_id":"abc"}`
-	r := httptest.NewRequest(http.MethodPost, "/v1/watchlist", strings.NewReader(body))
-	r = r.WithContext(middleware.WithUserID(r.Context(), "user-1"))
-	r.Header.Set("Content-Type", "application/json")
+// TestWatchlistAdd_ValidationBeforeAssetClassGuard: asset_class 가드는 DB 호출 필요라
+// fake repo + nil pool로는 도달 불가. 여기선 가드 이전 검증 단계만 테스트.
+// holdings_test.go(W3-T5)와 동일 패턴.
+func TestWatchlistAdd_ValidationBeforeAssetClassGuard(t *testing.T) {
+	repo := &fakeWatchlistRepo{}
+	h := NewWatchlistHandler(repo, nil)
 
-	w := httptest.NewRecorder()
-	h.Add(w, r)
-	if w.Code != http.StatusConflict {
-		t.Errorf("got %d want 409", w.Code)
+	cases := []struct {
+		name string
+		body string
+		want int
+	}{
+		{"missing instrument_id", `{}`, http.StatusUnprocessableEntity},
+		{"no auth", `{"instrument_id":"abc"}`, http.StatusUnauthorized},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var r *http.Request
+			if c.name == "no auth" {
+				r = httptest.NewRequest(http.MethodPost, "/v1/watchlist", strings.NewReader(c.body))
+			} else {
+				r = httptest.NewRequest(http.MethodPost, "/v1/watchlist", strings.NewReader(c.body))
+				r = r.WithContext(middleware.WithUserID(r.Context(), "user-1"))
+			}
+			r.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			h.Add(w, r)
+			if w.Code != c.want {
+				t.Errorf("got %d want %d, body=%s", w.Code, c.want, w.Body.String())
+			}
+		})
 	}
 }
 
 func TestWatchlistRemove_NotFound(t *testing.T) {
 	repo := &fakeWatchlistRepo{removeErr: ErrWatchlistNotFound}
-	h := NewWatchlistHandler(repo)
+	h := NewWatchlistHandler(repo, nil)
 	r := httptest.NewRequest(http.MethodDelete, "/v1/watchlist/iid-1", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("instrument_id", "iid-1")

@@ -23,7 +23,7 @@ export function WatchlistMiniCard() {
       <div className="text-xs text-fg-muted font-mono mb-3">관심 종목</div>
       {items.length === 0 ? (
         <div className="text-fg-muted text-sm font-mono">
-          아직 없음. 마켓 탭 (W5)에서 추가 예정
+          아직 없음. 마켓 탭에서 추가하세요.
         </div>
       ) : (
         <ul className="space-y-1 font-mono text-sm">

@@ -7,16 +7,18 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
 
 type WatchlistHandler struct {
 	repo WatchlistRepo
+	pool *pgxpool.Pool
 }
 
-func NewWatchlistHandler(repo WatchlistRepo) *WatchlistHandler {
-	return &WatchlistHandler{repo: repo}
+func NewWatchlistHandler(repo WatchlistRepo, pool *pgxpool.Pool) *WatchlistHandler {
+	return &WatchlistHandler{repo: repo, pool: pool}
 }
 
 func (h *WatchlistHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -53,6 +55,17 @@ func (h *WatchlistHandler) Add(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.InstrumentID == "" {
 		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "instrument_id required")
+		return
+	}
+	// asset_class 가드: INDEX·FX·CASH는 watchlist 대상이 아님 (W5).
+	// holdings.go(W3-T5)와 동일 패턴.
+	var assetClass string
+	if err := h.pool.QueryRow(r.Context(), `select asset_class from public.instruments where id = $1`, body.InstrumentID).Scan(&assetClass); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "instrument not found")
+		return
+	}
+	if assetClass == "INDEX" || assetClass == "FX" || assetClass == "CASH" {
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "asset_class not supported for watchlist: "+assetClass)
 		return
 	}
 	if err := h.repo.Add(r.Context(), uid, body.InstrumentID); err != nil {
