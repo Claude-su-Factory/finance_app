@@ -1,10 +1,10 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-25
+마지막 업데이트: 2026-05-26
 
 ## 현재 Phase
 
-**Phase 1 — W1·W2a·W2b·W3·W4 완료. W5 (마켓 탭) 작성 대기.**
+**Phase 1 — W1·W2a·W2b·W3·W4·W5 완료. Phase 1 핵심 종료 (외부 셋업·일부 후반 작업 남음).**
 
 ## 진행 중
 
@@ -87,6 +87,14 @@
 - ✅ W4-T14 메시지·스트리밍·도구 인디케이터·입력·사용량 (`d54eac2`)
 - ✅ W4-T15 BriefingCard 실 API 연결 (`c4de6d2`)
 - ✅ W4-T16 SSE 끊김 처리 + 이어서 받기 (`a78c691`)
+- ✅ W5-T1 history API (prices·indicators·fx) + 라우트 3개 + 7 테스트 (`a2a80cd`)
+- ✅ W5-T1.5 cron KR·US prices에 `*-IDX` exchange 포함 (인덱스 일봉 적재) (`5ca1b56`)
+- ✅ W5-T2 recharts 도입 + LineChartCard·Sparkline 공통 컴포넌트 (`8b39c74`)
+- ✅ W5-T3 history API 클라이언트 (`e4fe042`)
+- ✅ W5-T4 AdSlot 추상화 + NEXT_PUBLIC_ENABLE_ADS env (`d2fca16`)
+- ✅ W5-T5 마켓 탭 페이지 + KR/US 지수·환율·경제 지표 카드 (`0e07f14`)
+- ✅ W5-T6 watchlist editor + backend asset_class 가드 (`19eea04`)
+- ✅ W5-T7 포트폴리오 행 7일 스파크라인 (batch fetch) (`8c01b38`)
 
 ## 알려진 결함 / 백로그
 
@@ -97,13 +105,12 @@
 - **stack 버전 변경**: Next.js 16.2.6 + Tailwind v4 (스펙은 15 + v3) — 최신 GA 수용, 스펙 문서 업데이트 필요
 - **Go 1.25 강제**: pgx/v5 v5.9.2가 Go 1.25 요구. Task 14 Dockerfile · Task 15 CI 모두 `golang:1.25-alpine` / `go-version: "1.25"` 사용 필요
 - **Supabase Auth JWT secret**: CLI v2.98이 legacy 키 노출 안 함. 사용자가 dashboard에서 "Legacy JWT Secret" 활성화 필요. JWKS 마이그레이션 백로그
-- **KOSDAQ 종목 cron 일봉 누락**: `JobUpdateKRPrices`가 `.KS` 기본만 시도. KOSDAQ 종목은 backfill CLI(`-market KOSDAQ`)로 별도 백필 후 cron이 일별 갱신 못 함. W3에서 `instruments.market` 컬럼 추가 검토
+- **KOSDAQ 종목 cron 일봉 — 부분 해결 (W5)**: `JobUpdateKRPrices`가 W5에서 `KOSPI`/`KOSDAQ` exchange 매칭으로 확장. KIND에서 적재된 종목의 exchange가 정확히 `KOSPI`/`KOSDAQ`이면 cron이 일별 갱신. 단, 실 KIND 적재 결과 확인 필요 (`-market KOSDAQ` 백필 후 exchange 값 점검)
 - **US 장중 NY Friday 후반 세션 누락**: `IsUSMarketOpen`이 토요일 일괄 false. KST 토요일 새벽 NY Friday 정규장(quotes 분 단위 폴링) skip. 일봉(prices)은 06:00 cron이 별도 처리 → 데이터 손실 없음
 - **US 장중 DST 미반영**: KST 23:30~06:00 고정. 미국 일광절약시간 기간 30분 어긋남
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
-- **watchlist 추가 UI 부재**: 백엔드 API + 홈 미니카드 조회만 W3에 포함. 종목 추가/제거 UI는 W5 마켓 탭에서 제공 예정
-- **포트폴리오 미니 스파크라인 미구현**: 스펙 §6 보유 테이블의 종목별 7일 가격 sparkline은 Phase 1 후반(W5)로 미룸. recharts 도입 + prices 7일 조회 API 동시 작업
-- **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 위와 동일 시점
+- **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 Phase 1 후반·v2로 미룸
+- **AdSense 미가입**: AdSlot은 `NEXT_PUBLIC_ENABLE_ADS=false` 기본 → placeholder만. 가입자 100명·일평균 PV 500 도달 시 Phase 2에서 활성
 - **AI RealClient 미구현**: anthropic-sdk-go 어댑터는 stub. 사용자가 ANTHROPIC_API_KEY 설정해도 stub error 반환. claude-api 스킬로 실 SDK 호출 코드 작성 필요 (별도 백로그). 빈 키일 때만 Mock으로 동작
 - **AI 컨텍스트 요약 미구현**: 20+ 메시지 시 placeholder만, Haiku 요약 부재. v2 검토
 - **일일 브리핑 도구 호출 없음**: MVP는 단순 1턴 호출. spec §10-8의 "보유 자산+어제 시세 입력"은 system prompt에 텍스트로만 — 도구 호출 통합은 v2
@@ -112,6 +119,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-26 W5 전체 완료. 마켓 탭(`/app/market`) — KR/US 지수·환율·경제 지표 4종 카드 + 관심 종목 editor + AdSlot. recharts 도입(LineChartCard·Sparkline). history API 3 라우트(prices·indicators·fx) + 인덱스 일봉 cron 확장(`*-IDX` exchange 포함). 포트폴리오 행 7일 스파크라인(batch fetch). watchlist backend asset_class 가드. Phase 1 핵심 완료.
 - 2026-05-25 W4 전체 완료. AI 채팅 — Mock·Stub 클라이언트 + 9개 도구 + SSE 스트리밍(tool routing turn별 메시지 묶음, max depth 8, session_id in done) + 사용량 추적(월 30회·50K/10K·Opus 1회) + 일일 브리핑 cron(사용자 hash 분단위 분산) + 채팅 UI(세션 리스트·메시지·도구 인디케이터·입력·사용량 배지) + 끊김 처리(이어서 받기). dev에서 API 키 없이 Mock으로 전 흐름 검증 가능.
 - 2026-05-23 W3 후속 FX fix. `jobs_fx.go`에 EUR_KRW/JPY_KRW derived 계산 추가 (USD_KRW / USD_EUR, USD_KRW / USD_JPY). prev rates에도 동일 적용으로 change_pct 정상화. holdings KRW 환산 정확도 회복.
 - 2026-05-23 W3 전체 완료. holdings·watchlist 마이그+CRUD API + asset_class 가드 + FX 환산 + cron polling union 확장(JobUpdateMarketQuotes rename) + 포트폴리오 페이지(CRUD 모달) + 홈 대시보드 6카드 + 온보딩 3단계 복원(세션 가드+toast).

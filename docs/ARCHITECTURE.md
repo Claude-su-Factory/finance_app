@@ -116,5 +116,16 @@ graph TB
 
 **How**: CEO·CTO·CFO 페르소나로 결정. 페르소나 명시 후 결정 사유 기록. 실행 페르소나는 `docs/AGENTS.md` 참고.
 
+### 10. 차트 라이브러리 — recharts (W5)
+
+**Why**: React 표준 + SVG + TypeScript 지원. 단일 라이브러리로 라인·도넛·미니 스파크라인 모두 처리. 도입 비용 낮고 커뮤니티 견고. ~80KB gzipped.
+
+**How**:
+- 마켓 탭 `LineChartCard` + 포트폴리오·watchlist `Sparkline` 공통 사용.
+- `next/dynamic` + `ssr: false`로 사용 페이지에서만 로드 (SSR 단계 회피 — recharts는 window 의존).
+- 색상은 hex 직접 (Tailwind class 미인식). `chart-tokens.ts`에 토큰 집중.
+
+**Trade-off**: lightweight-charts 대비 캔들·볼린저 등 금융 차트 전용 기능 부재 → v2 이후 트레이딩뷰 스타일 필요 시 별도 페이지로 분리 검토.
+
 ---
 업데이트 규칙: 새 컴포넌트·중대 설계 변경에만 추가. Why를 반드시 명시. 변경이력은 STATUS의 "최근 변경 이력"에 동시 기록.
