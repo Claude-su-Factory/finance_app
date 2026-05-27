@@ -4,9 +4,11 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/quotient/quotient/apps/api/internal/auth"
 	"github.com/quotient/quotient/apps/api/internal/handlers"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
+	"github.com/quotient/quotient/apps/api/internal/observability"
 )
 
 func New(
@@ -23,6 +25,9 @@ func New(
 	readyz http.HandlerFunc,
 ) *chi.Mux {
 	r := chi.NewRouter()
+	r.Use(chimw.RequestID)
+	r.Use(observability.SentryMiddleware())
+	r.Use(chimw.Recoverer)
 	r.Use(middleware.CORS(corsOrigin))
 	r.Get("/healthz", handlers.Healthz)
 	r.Get("/readyz", readyz)

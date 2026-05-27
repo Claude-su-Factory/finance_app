@@ -17,6 +17,7 @@ import (
 	"github.com/quotient/quotient/apps/api/internal/config"
 	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/handlers"
+	"github.com/quotient/quotient/apps/api/internal/observability"
 	"github.com/quotient/quotient/apps/api/internal/router"
 	"github.com/quotient/quotient/apps/api/internal/schedule"
 	"github.com/quotient/quotient/apps/api/internal/sources/ecos"
@@ -35,6 +36,11 @@ func main() {
 		logger.Error("config load failed", "err", err)
 		os.Exit(1)
 	}
+
+	if err := observability.InitSentry(cfg.SentryDSN, cfg.Env, ""); err != nil {
+		logger.Warn("sentry init failed (continuing without)", "err", err)
+	}
+	defer observability.Flush()
 
 	// cron 잡 ctx — 잡 내 외부 호출 cancel 전파 가능하도록 별도 cancel 보유
 	ctx, cancel := context.WithCancel(context.Background())
