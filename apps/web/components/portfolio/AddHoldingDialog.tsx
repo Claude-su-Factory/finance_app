@@ -80,6 +80,11 @@ export function AddHoldingDialog({
           <DialogTitle className="font-mono">보유 자산 추가</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="border-l-2 border-bb-warn/60 bg-bb-warn/5 px-3 py-2 text-xs text-fg-muted leading-relaxed">
+            <span className="font-mono text-bb-warn">i</span>{" "}
+            입력 데이터는 본인이 직접 기록하며 실제 보유 여부는 검증하지 않습니다.
+            분석 정확성은 입력 정확성에 따릅니다.
+          </div>
           <div>
             <Label className="text-xs font-mono">종목</Label>
             <InstrumentSearchInput onSelect={setInst} />

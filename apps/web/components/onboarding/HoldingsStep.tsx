@@ -42,6 +42,12 @@ export function HoldingsStep({
       <h2 className="font-mono text-lg">첫 보유 자산을 1~3개 추가하세요</h2>
       <p className="text-fg-muted text-xs font-mono">건너뛰면 빈 포트폴리오로 시작합니다. 나중에 언제든 추가할 수 있습니다.</p>
 
+      <div className="border-l-2 border-bb-warn/60 bg-bb-warn/5 px-3 py-2 text-xs text-fg-muted leading-relaxed">
+        <span className="font-mono text-bb-warn">i</span>{" "}
+        본 서비스는 증권사 자동 연동 없이 본인이 직접 기록하는 <span className="text-fg">개인 분석 도구</span>입니다.
+        실제 보유 여부는 검증하지 않으며, 분석 정확성은 입력 정확성에 따릅니다.
+      </div>
+
       {value.length > 0 && (
         <ul className="space-y-1 font-mono text-sm border border-line p-2">
           {value.map((d, i) => (
