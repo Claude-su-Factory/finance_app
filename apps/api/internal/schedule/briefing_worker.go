@@ -56,7 +56,7 @@ func JobBriefingDispatcher(ctx context.Context, d Deps, client ai.Client, regist
 		if exists {
 			continue
 		}
-		content := generateBriefing(ctx, client, registry, u.id)
+		content := generateBriefing(ctx, client, registry, d, u.id)
 		_, err := d.Pool.Exec(ctx, `
 			insert into public.ai_briefings (user_id, date, content_md, model)
 			values ($1, $2, $3, $4)
@@ -82,11 +82,11 @@ func userMinuteSlot(uid string) int {
 // system prompt에 주입한 뒤 ai.Client를 1턴 호출.
 // registry가 nil이면 데이터 주입 없이 일반 안내 브리핑 (fallback).
 // spec §10-8: "보유 자산 + 어제 시세 변화 + 주요 지수·환율 변화 + 관심 종목 변화" 입력.
-func generateBriefing(ctx context.Context, client ai.Client, registry *tools.Registry, uid string) string {
+func generateBriefing(ctx context.Context, client ai.Client, registry *tools.Registry, d Deps, uid string) string {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	system := buildBriefingSystem(ctx, registry, uid)
+	system := buildBriefingSystem(ctx, registry, d, uid)
 
 	req := ai.ChatRequest{
 		Model:  ai.ModelSonnet,
@@ -115,7 +115,7 @@ func generateBriefing(ctx context.Context, client ai.Client, registry *tools.Reg
 
 // buildBriefingSystem composes the system prompt with prefetched user data.
 // registry nil → fallback system without data injection.
-func buildBriefingSystem(ctx context.Context, registry *tools.Registry, uid string) string {
+func buildBriefingSystem(ctx context.Context, registry *tools.Registry, d Deps, uid string) string {
 	base := `당신은 Quotient의 일일 브리핑 작성자입니다. 한국어 마크다운 3~5문장으로 작성하세요.
 
 규칙:
@@ -127,9 +127,9 @@ func buildBriefingSystem(ctx context.Context, registry *tools.Registry, uid stri
 		return base
 	}
 
-	portfolio := tools.ExecuteAndSerialize(ctx, registry, "get_portfolio", uid, map[string]any{})
-	market := tools.ExecuteAndSerialize(ctx, registry, "get_market_overview", uid, map[string]any{})
-	watchlist := tools.ExecuteAndSerialize(ctx, registry, "get_watchlist", uid, map[string]any{})
+	portfolio := tools.ExecuteAndSerialize(ctx, registry, d.Pool, "get_portfolio", uid, map[string]any{})
+	market := tools.ExecuteAndSerialize(ctx, registry, d.Pool, "get_market_overview", uid, map[string]any{})
+	watchlist := tools.ExecuteAndSerialize(ctx, registry, d.Pool, "get_watchlist", uid, map[string]any{})
 
 	return fmt.Sprintf(`%s
 

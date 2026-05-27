@@ -199,7 +199,7 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 					"type": "tool_use", "id": id, "name": name, "input": input,
 				})
 				// 즉시 실행
-				result := tools.ExecuteAndSerialize(r.Context(), h.registry, name, uid, input)
+				result := tools.ExecuteAndSerialize(r.Context(), h.registry, h.pool, name, uid, input)
 				writeSSE(w, flusher, "tool_result", map[string]any{
 					"id": id, "name": name, "result": result,
 				})

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 type fakeTool struct {
@@ -16,7 +17,9 @@ type fakeTool struct {
 func (f *fakeTool) Spec() ai.ToolSpec {
 	return ai.ToolSpec{Name: f.name, Description: "test", InputSchema: map[string]any{"type": "object"}}
 }
-func (f *fakeTool) Run(ctx context.Context, userID string, input map[string]any) (any, error) {
+func (f *fakeTool) RequiresUserContext() bool { return false }
+func (f *fakeTool) Run(ctx context.Context, exec db.Executor, userID string, input map[string]any) (any, error) {
+	_ = exec
 	return f.out, f.err
 }
 
@@ -49,7 +52,7 @@ func TestRegistry_Specs(t *testing.T) {
 func TestExecuteAndSerialize_Success(t *testing.T) {
 	r := NewRegistry()
 	r.Register(&fakeTool{name: "foo", out: map[string]any{"value": 42}})
-	s := ExecuteAndSerialize(context.Background(), r, "foo", "user-1", nil)
+	s := ExecuteAndSerialize(context.Background(), r, nil, "foo", "user-1", nil)
 	if s != `{"value":42}` {
 		t.Errorf("got %s", s)
 	}
@@ -57,7 +60,7 @@ func TestExecuteAndSerialize_Success(t *testing.T) {
 
 func TestExecuteAndSerialize_UnknownTool(t *testing.T) {
 	r := NewRegistry()
-	s := ExecuteAndSerialize(context.Background(), r, "missing", "user-1", nil)
+	s := ExecuteAndSerialize(context.Background(), r, nil, "missing", "user-1", nil)
 	if s != `{"error":"unknown tool: missing"}` {
 		t.Errorf("got %s", s)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 type getQuote struct{ *Deps }
@@ -22,7 +23,8 @@ func (t *getQuote) Spec() ai.ToolSpec {
 		},
 	}
 }
-func (t *getQuote) Run(ctx context.Context, _ string, input map[string]any) (any, error) {
+func (t *getQuote) RequiresUserContext() bool { return false }
+func (t *getQuote) Run(ctx context.Context, exec db.Executor, _ string, input map[string]any) (any, error) {
 	sym, _ := input["symbol"].(string)
 	iid, _ := input["instrument_id"].(string)
 	if sym == "" && iid == "" {
@@ -31,7 +33,7 @@ func (t *getQuote) Run(ctx context.Context, _ string, input map[string]any) (any
 	var row [5]any
 	var err error
 	if iid != "" {
-		err = t.Pool.QueryRow(ctx, `
+		err = exec.QueryRow(ctx, `
 			select i.symbol, i.name, i.currency,
 			       coalesce(q.price, 0)::float8, coalesce(q.change_pct, 0)::float8
 			from public.instruments i
@@ -39,7 +41,7 @@ func (t *getQuote) Run(ctx context.Context, _ string, input map[string]any) (any
 			where i.id = $1
 		`, iid).Scan(&row[0], &row[1], &row[2], &row[3], &row[4])
 	} else {
-		err = t.Pool.QueryRow(ctx, `
+		err = exec.QueryRow(ctx, `
 			select i.symbol, i.name, i.currency,
 			       coalesce(q.price, 0)::float8, coalesce(q.change_pct, 0)::float8
 			from public.instruments i
@@ -73,7 +75,8 @@ func (t *getPriceHistory) Spec() ai.ToolSpec {
 		},
 	}
 }
-func (t *getPriceHistory) Run(ctx context.Context, _ string, input map[string]any) (any, error) {
+func (t *getPriceHistory) RequiresUserContext() bool { return false }
+func (t *getPriceHistory) Run(ctx context.Context, exec db.Executor, _ string, input map[string]any) (any, error) {
 	sym, _ := input["symbol"].(string)
 	rng, _ := input["range"].(string)
 	if sym == "" || rng == "" {
@@ -86,7 +89,7 @@ func (t *getPriceHistory) Run(ctx context.Context, _ string, input map[string]an
 	if interval == "" {
 		return nil, fmt.Errorf("invalid range")
 	}
-	rows, err := t.Pool.Query(ctx, `
+	rows, err := exec.Query(ctx, `
 		select p.date, p.close::float8
 		from public.prices p
 		join public.instruments i on i.id = p.instrument_id
@@ -118,8 +121,9 @@ func (t *getMarketOverview) Spec() ai.ToolSpec {
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
 	}
 }
-func (t *getMarketOverview) Run(ctx context.Context, _ string, _ map[string]any) (any, error) {
-	rows, err := t.Pool.Query(ctx, `
+func (t *getMarketOverview) RequiresUserContext() bool { return false }
+func (t *getMarketOverview) Run(ctx context.Context, exec db.Executor, _ string, _ map[string]any) (any, error) {
+	rows, err := exec.Query(ctx, `
 		select i.symbol, i.name, i.asset_class,
 		       coalesce(q.price, 0)::float8, coalesce(q.change_pct, 0)::float8
 		from public.instruments i

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 type searchInstrument struct{ *Deps }
@@ -21,13 +22,14 @@ func (t *searchInstrument) Spec() ai.ToolSpec {
 		},
 	}
 }
-func (t *searchInstrument) Run(ctx context.Context, _ string, input map[string]any) (any, error) {
+func (t *searchInstrument) RequiresUserContext() bool { return false }
+func (t *searchInstrument) Run(ctx context.Context, exec db.Executor, _ string, input map[string]any) (any, error) {
 	q, _ := input["query"].(string)
 	q = strings.TrimSpace(q)
 	if q == "" {
 		return nil, fmt.Errorf("query required")
 	}
-	rows, err := t.Pool.Query(ctx, `
+	rows, err := exec.Query(ctx, `
 		select i.id::text, i.symbol, i.exchange, i.name, i.asset_class, i.currency
 		from public.instrument_aliases a
 		join public.instruments i on i.id = a.instrument_id
@@ -43,7 +45,7 @@ func (t *searchInstrument) Run(ctx context.Context, _ string, input map[string]a
 	}
 	if len(results) == 0 {
 		pat := "%" + strings.ToLower(q) + "%"
-		rows2, err := t.Pool.Query(ctx, `
+		rows2, err := exec.Query(ctx, `
 			select id::text, symbol, exchange, name, asset_class, currency from public.instruments
 			where (lower(name) like $1 or lower(symbol) like $1) and is_active = true
 			order by length(symbol) asc
@@ -90,8 +92,9 @@ func (t *getWatchlist) Spec() ai.ToolSpec {
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
 	}
 }
-func (t *getWatchlist) Run(ctx context.Context, userID string, _ map[string]any) (any, error) {
-	rows, err := t.Pool.Query(ctx, `
+func (t *getWatchlist) RequiresUserContext() bool { return true }
+func (t *getWatchlist) Run(ctx context.Context, exec db.Executor, userID string, _ map[string]any) (any, error) {
+	rows, err := exec.Query(ctx, `
 		select i.symbol, i.name, i.currency,
 		       coalesce(q.price, 0)::float8, coalesce(q.change_pct, 0)::float8
 		from public.watchlist w
@@ -132,12 +135,13 @@ func (t *getEconomicIndicator) Spec() ai.ToolSpec {
 		},
 	}
 }
-func (t *getEconomicIndicator) Run(ctx context.Context, _ string, input map[string]any) (any, error) {
+func (t *getEconomicIndicator) RequiresUserContext() bool { return false }
+func (t *getEconomicIndicator) Run(ctx context.Context, exec db.Executor, _ string, input map[string]any) (any, error) {
 	code, _ := input["code"].(string)
 	if code == "" {
 		return nil, fmt.Errorf("code required")
 	}
-	rows, err := t.Pool.Query(ctx, `
+	rows, err := exec.Query(ctx, `
 		select observed_at, value::float8
 		from public.economic_indicators
 		where code = $1

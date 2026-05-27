@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 // --- get_portfolio ---
@@ -17,8 +18,9 @@ func (t *getPortfolio) Spec() ai.ToolSpec {
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
 	}
 }
-func (t *getPortfolio) Run(ctx context.Context, userID string, _ map[string]any) (any, error) {
-	rows, err := t.Pool.Query(ctx, `
+func (t *getPortfolio) RequiresUserContext() bool { return true }
+func (t *getPortfolio) Run(ctx context.Context, exec db.Executor, userID string, _ map[string]any) (any, error) {
+	rows, err := exec.Query(ctx, `
 		select h.id::text, i.symbol, i.name, i.asset_class, i.currency,
 		       h.quantity::float8, h.avg_cost::float8,
 		       coalesce(q.price, 0)::float8, h.opened_at
@@ -64,12 +66,13 @@ func (t *getHoldingDetail) Spec() ai.ToolSpec {
 		},
 	}
 }
-func (t *getHoldingDetail) Run(ctx context.Context, userID string, input map[string]any) (any, error) {
+func (t *getHoldingDetail) RequiresUserContext() bool { return true }
+func (t *getHoldingDetail) Run(ctx context.Context, exec db.Executor, userID string, input map[string]any) (any, error) {
 	iid, _ := input["instrument_id"].(string)
 	if iid == "" {
 		return nil, fmt.Errorf("instrument_id required")
 	}
-	row := t.Pool.QueryRow(ctx, `
+	row := exec.QueryRow(ctx, `
 		select h.id::text, i.symbol, i.name, i.asset_class, i.currency,
 		       h.quantity::float8, h.avg_cost::float8,
 		       coalesce(q.price, 0)::float8, h.opened_at, h.note
@@ -108,8 +111,9 @@ func (t *calcPortfolioMetrics) Spec() ai.ToolSpec {
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
 	}
 }
-func (t *calcPortfolioMetrics) Run(ctx context.Context, userID string, _ map[string]any) (any, error) {
-	rows, err := t.Pool.Query(ctx, `
+func (t *calcPortfolioMetrics) RequiresUserContext() bool { return true }
+func (t *calcPortfolioMetrics) Run(ctx context.Context, exec db.Executor, userID string, _ map[string]any) (any, error) {
+	rows, err := exec.Query(ctx, `
 		select i.asset_class, i.currency, h.quantity::float8 * coalesce(q.price, 0)::float8 as mv
 		from public.holdings h
 		join public.instruments i on i.id = h.instrument_id

@@ -7,14 +7,17 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 // Tool은 단일 도구 함수.
-// userID는 RLS 우회 superuser pool 패턴에서 WHERE user_id 필터에 사용.
-// 미래 JWT 기반 풀 전환 시 시그니처는 동일 유지(의미만 jwt→userID 변환).
+// 모든 도구는 db.Executor를 받아 트랜잭션·풀 양쪽에서 동작.
+// RequiresUserContext가 true면 ExecuteAndSerialize가 db.AsUser로 wrap하여
+// Supabase RLS가 자동 적용되도록 한다. false면 슈퍼유저 풀 직접 사용(공개 데이터).
 type Tool interface {
 	Spec() ai.ToolSpec
-	Run(ctx context.Context, userID string, input map[string]any) (any, error)
+	Run(ctx context.Context, exec db.Executor, userID string, input map[string]any) (any, error)
+	RequiresUserContext() bool
 }
 
 type Registry struct {
@@ -54,13 +57,35 @@ func (r *Registry) Specs() []ai.ToolSpec {
 }
 
 // ExecuteAndSerialize는 도구 실행 + 결과 JSON 직렬화 (tool_result content).
+// 사용자 데이터 도구는 db.AsUser로 트랜잭션 wrap → RLS 자동 적용.
+// pool == nil이면(테스트) wrap 우회 — fake 도구가 exec 무시.
 // 실패 시 error 메시지를 result로 반환 (Claude가 retry 결정).
-func ExecuteAndSerialize(ctx context.Context, r *Registry, name, userID string, input map[string]any) string {
+func ExecuteAndSerialize(ctx context.Context, r *Registry, pool *pgxpool.Pool, name, userID string, input map[string]any) string {
 	t, ok := r.Get(name)
 	if !ok {
 		return fmt.Sprintf(`{"error":"unknown tool: %s"}`, name)
 	}
-	out, err := t.Run(ctx, userID, input)
+
+	var out any
+	var err error
+	if t.RequiresUserContext() && pool != nil {
+		err = db.AsUser(ctx, pool, userID, func(exec db.Executor) error {
+			o, e := t.Run(ctx, exec, userID, input)
+			if e != nil {
+				return e
+			}
+			out = o
+			return nil
+		})
+	} else {
+		// 공개 데이터 도구 또는 test passthrough.
+		var exec db.Executor
+		if pool != nil {
+			exec = pool
+		}
+		out, err = t.Run(ctx, exec, userID, input)
+	}
+
 	if err != nil {
 		b, _ := json.Marshal(err.Error())
 		return fmt.Sprintf(`{"error":%s}`, b)
