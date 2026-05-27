@@ -1,12 +1,5 @@
 package handlers
 
-// TODO(security): 이 repo는 postgres 슈퍼유저 풀로 연결되어 RLS를 우회한다.
-// 현재는 핸들러의 `WHERE id = uid` (JWT에서 추출한 uid) 필터로 격리하지만,
-// 다중 행 쿼리가 추가되는 W3 이후 시점에 다음 중 하나로 전환 필요:
-//   (a) Supabase PostgREST를 사용자 JWT로 호출
-//   (b) SET LOCAL role = authenticated + request.jwt.claims 패턴
-// 스펙 §10-1 (사용자 JWT 전파)와 정합 위해 W3 전 재검토.
-
 import (
 	"context"
 	"errors"
@@ -14,21 +7,18 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 var ErrProfileNotFound = errors.New("profile not found")
 
-type PgProfileRepo struct {
-	pool *pgxpool.Pool
-}
+// PgProfileRepo는 stateless. 호출자가 db.Executor(트랜잭션 또는 풀)를 주입.
+type PgProfileRepo struct{}
 
-func NewPgProfileRepo(pool *pgxpool.Pool) *PgProfileRepo {
-	return &PgProfileRepo{pool: pool}
-}
+func NewPgProfileRepo() *PgProfileRepo { return &PgProfileRepo{} }
 
-func (r *PgProfileRepo) Get(ctx context.Context, uid string) (map[string]any, error) {
-	row := r.pool.QueryRow(ctx, `
+func (r *PgProfileRepo) Get(ctx context.Context, exec db.Executor, uid string) (map[string]any, error) {
+	row := exec.QueryRow(ctx, `
 		select id, display_name, base_currency, ui_intensity,
 		       onboarding_completed, daily_briefing_enabled,
 		       created_at, updated_at
@@ -55,7 +45,7 @@ func (r *PgProfileRepo) Get(ctx context.Context, uid string) (map[string]any, er
 	}, nil
 }
 
-func (r *PgProfileRepo) Update(ctx context.Context, uid string, patch map[string]any) (map[string]any, error) {
+func (r *PgProfileRepo) Update(ctx context.Context, exec db.Executor, uid string, patch map[string]any) (map[string]any, error) {
 	sets := []string{}
 	args := []any{}
 	i := 1
@@ -68,8 +58,7 @@ func (r *PgProfileRepo) Update(ctx context.Context, uid string, patch map[string
 		}
 	}
 	if len(sets) == 0 {
-		// No whitelisted fields — fall back to Get to return current state
-		return r.Get(ctx, uid)
+		return r.Get(ctx, exec, uid)
 	}
 	args = append(args, uid)
 	q := fmt.Sprintf(`update public.profiles set %s where id = $%d
@@ -77,7 +66,7 @@ func (r *PgProfileRepo) Update(ctx context.Context, uid string, patch map[string
 		          onboarding_completed, daily_briefing_enabled, created_at, updated_at`,
 		strings.Join(sets, ", "), i)
 
-	row := r.pool.QueryRow(ctx, q, args...)
+	row := exec.QueryRow(ctx, q, args...)
 	var id, baseCurrency, uiIntensity string
 	var displayName *string
 	var onboarding, daily bool

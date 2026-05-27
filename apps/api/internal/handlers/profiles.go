@@ -7,20 +7,37 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 )
 
 type ProfileRepo interface {
-	Get(ctx context.Context, userID string) (map[string]any, error)
-	Update(ctx context.Context, userID string, patch map[string]any) (map[string]any, error)
+	Get(ctx context.Context, exec db.Executor, uid string) (map[string]any, error)
+	Update(ctx context.Context, exec db.Executor, uid string, patch map[string]any) (map[string]any, error)
 }
+
+// txRunner는 핸들러가 사용하는 트랜잭션 wrap 추상화.
+// production: db.AsUser(pool, uid, fn). test: passthrough(nil exec).
+type txRunner func(ctx context.Context, fn func(db.Executor) error) error
 
 type ProfileHandler struct {
 	repo ProfileRepo
+	run  txRunner
 }
 
-func NewProfileHandler(repo ProfileRepo) *ProfileHandler {
-	return &ProfileHandler{repo: repo}
+// NewProfileHandler는 production용. pool == nil이면 test passthrough.
+func NewProfileHandler(repo ProfileRepo, pool *pgxpool.Pool) *ProfileHandler {
+	h := &ProfileHandler{repo: repo}
+	if pool == nil {
+		h.run = func(ctx context.Context, fn func(db.Executor) error) error { return fn(nil) }
+		return h
+	}
+	h.run = func(ctx context.Context, fn func(db.Executor) error) error {
+		uid := middleware.UserID(ctx)
+		return db.AsUser(ctx, pool, uid, fn)
+	}
+	return h
 }
 
 func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +46,15 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
 		return
 	}
-	p, err := h.repo.Get(r.Context(), uid)
+	var out map[string]any
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		p, err := h.repo.Get(r.Context(), exec, uid)
+		if err != nil {
+			return err
+		}
+		out = p
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrProfileNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "profile not found")
@@ -39,7 +64,7 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load profile")
 		return
 	}
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *ProfileHandler) Patch(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +73,7 @@ func (h *ProfileHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 4096) // 4KB max for profile patch
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	var patch map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid json")
@@ -62,7 +87,15 @@ func (h *ProfileHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "ui_intensity invalid")
 		return
 	}
-	updated, err := h.repo.Update(r.Context(), uid, patch)
+	var updated map[string]any
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		u, err := h.repo.Update(r.Context(), exec, uid, patch)
+		if err != nil {
+			return err
+		}
+		updated = u
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrProfileNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "profile not found")

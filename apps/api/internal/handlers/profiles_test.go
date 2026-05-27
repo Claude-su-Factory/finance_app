@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,11 +18,13 @@ type fakeRepo struct {
 	updErr  error
 }
 
-func (r *fakeRepo) Get(ctx context.Context, uid string) (map[string]any, error) {
+func (r *fakeRepo) Get(ctx context.Context, exec db.Executor, uid string) (map[string]any, error) {
+	_ = exec
 	return r.getResp, nil
 }
 
-func (r *fakeRepo) Update(ctx context.Context, uid string, patch map[string]any) (map[string]any, error) {
+func (r *fakeRepo) Update(ctx context.Context, exec db.Executor, uid string, patch map[string]any) (map[string]any, error) {
+	_ = exec
 	if r.updErr != nil {
 		return nil, r.updErr
 	}
@@ -45,7 +48,7 @@ func TestGetProfile_ReturnsCurrent(t *testing.T) {
 		"display_name":  "Hojin",
 		"base_currency": "KRW",
 	}}
-	h := NewProfileHandler(repo)
+	h := NewProfileHandler(repo, nil)
 	req := reqWithUser(http.MethodGet, "/v1/profile", nil, "user-1")
 	rec := httptest.NewRecorder()
 
@@ -58,7 +61,7 @@ func TestGetProfile_ReturnsCurrent(t *testing.T) {
 }
 
 func TestGetProfile_NoUser_Unauthorized(t *testing.T) {
-	h := NewProfileHandler(&fakeRepo{})
+	h := NewProfileHandler(&fakeRepo{}, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
 	rec := httptest.NewRecorder()
 
@@ -69,7 +72,7 @@ func TestGetProfile_NoUser_Unauthorized(t *testing.T) {
 
 func TestPatchProfile_AcceptsValidBody(t *testing.T) {
 	repo := &fakeRepo{getResp: map[string]any{"id": "user-1"}}
-	h := NewProfileHandler(repo)
+	h := NewProfileHandler(repo, nil)
 	body, _ := json.Marshal(map[string]any{"base_currency": "USD"})
 	req := reqWithUser(http.MethodPatch, "/v1/profile", body, "user-1")
 	rec := httptest.NewRecorder()
@@ -80,7 +83,7 @@ func TestPatchProfile_AcceptsValidBody(t *testing.T) {
 }
 
 func TestPatchProfile_RejectsInvalidCurrency(t *testing.T) {
-	h := NewProfileHandler(&fakeRepo{})
+	h := NewProfileHandler(&fakeRepo{}, nil)
 	body, _ := json.Marshal(map[string]any{"base_currency": "EUR"})
 	req := reqWithUser(http.MethodPatch, "/v1/profile", body, "user-1")
 	rec := httptest.NewRecorder()
@@ -91,7 +94,7 @@ func TestPatchProfile_RejectsInvalidCurrency(t *testing.T) {
 }
 
 func TestPatchProfile_RejectsInvalidUIIntensity(t *testing.T) {
-	h := NewProfileHandler(&fakeRepo{})
+	h := NewProfileHandler(&fakeRepo{}, nil)
 	body, _ := json.Marshal(map[string]any{"ui_intensity": "bright"})
 	req := reqWithUser(http.MethodPatch, "/v1/profile", body, "user-1")
 	rec := httptest.NewRecorder()

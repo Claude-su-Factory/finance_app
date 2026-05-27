@@ -48,8 +48,8 @@ func main() {
 	defer pool.Close()
 
 	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret)
-	profileRepo := handlers.NewPgProfileRepo(pool)
-	profileHandler := handlers.NewProfileHandler(profileRepo)
+	profileRepo := handlers.NewPgProfileRepo()
+	profileHandler := handlers.NewProfileHandler(profileRepo, pool)
 	marketRepo := handlers.NewPgMarketRepo(pool)
 	marketHandler := handlers.NewMarketHandler(marketRepo)
 	instrumentRepo := handlers.NewPgInstrumentRepo(pool)
