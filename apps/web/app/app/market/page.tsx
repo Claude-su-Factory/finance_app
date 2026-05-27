@@ -15,8 +15,6 @@ export default function MarketPage() {
         </div>
       </header>
 
-      <AdSlot slot="market_top" height={72} label="market_top" />
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <KRIndicesCard />
         <USIndicesCard />
@@ -27,6 +25,11 @@ export default function MarketPage() {
         <IndicatorsCard code="DGS10" title="US 10Y Treasury" unit="%" />
         <IndicatorsCard code="722Y001" title="BOK 기준금리" unit="%" />
         <WatchlistEditorCard />
+      </div>
+
+      <div className="pt-4">
+        <p className="text-fg-muted/50 font-mono text-[10px] mb-1">광고</p>
+        <AdSlot slot="market_bottom" height={90} label="market_bottom" />
       </div>
     </div>
   );

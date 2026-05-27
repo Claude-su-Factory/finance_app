@@ -121,6 +121,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-27 수익화 1단계 코드 — AdSense 실 통합(`<ins>` + `adsbygoogle.push`, layout 스크립트 lazy load) + Toss 개인 후원 사이드바 footer 아이콘. 환경변수 미설정 시 둘 다 비활성 → MVP 무료 출시 정합. 노출 정책: 마켓 페이지 하단만(`market_bottom` 슬롯). 사용자가 AdSense 가입 후 `NEXT_PUBLIC_ADSENSE_CLIENT` + `NEXT_PUBLIC_ADSENSE_SLOT_MARKET_BOTTOM` + `NEXT_PUBLIC_TOSS_DONATION_URL` 주입하면 활성.
 - 2026-05-27 W1-T13~T16 코드 부분 완료 (외부 계정 셋업은 사용자 액션 남음). Sentry(go·next) + PostHog(next) SDK 통합 — DSN/Key 미설정 시 no-op. Fly Dockerfile + fly.toml, Vercel vercel.json, GitHub Actions(ci.yml + deploy-api.yml + deploy-web.yml). 가이드 `docs/DEPLOY.md` + 스모크 체크리스트 `docs/E2E_SMOKE.md`.
 - 2026-05-27 AI 도구 호출 JWT 전파. Tool 인터페이스에 `RequiresUserContext()` 추가, 모든 9개 도구가 `db.Executor` 받음. `ExecuteAndSerialize`가 사용자 데이터 도구 4개(portfolio/holdingDetail/calcMetrics/watchlist)만 `db.AsUser` 트랜잭션 wrap → 공개 도구 5개(quote/priceHistory/marketOverview/search/economicIndicator)는 슈퍼유저 풀 그대로. chat tool routing + briefing 워커 호출 wiring 포함. spec §10-1 완전 정합.
 - 2026-05-27 Profile handler 통합 테스트 4건 추가 — 실 Postgres + 트리거 자동 생성 + PATCH→GET 영속화 + RLS 격리 종단 검증.

@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { PostHogProvider } from "@/components/analytics/PostHogProvider";
 import "./globals.css";
+
+const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+const ADS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_ADS === "true";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -31,6 +35,14 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`${geistMono.variable} ${pretendard.variable} dark`}>
       <body>
+        {ADS_ENABLED && ADSENSE_CLIENT ? (
+          <Script
+            async
+            strategy="afterInteractive"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+            crossOrigin="anonymous"
+          />
+        ) : null}
         <PostHogProvider>{children}</PostHogProvider>
       </body>
     </html>
