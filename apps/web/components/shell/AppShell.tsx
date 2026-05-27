@@ -1,6 +1,7 @@
 import { Sidebar } from "./Sidebar";
 import { TopTicker } from "./TopTicker";
 import { StatusBar } from "./StatusBar";
+import { CommandLauncher } from "@/components/command/CommandLauncher";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
       <StatusBar />
+      <CommandLauncher />
     </div>
   );
 }

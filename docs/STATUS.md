@@ -119,6 +119,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-27 명령 팔레트 ⌘K + vim-like 단축키. cmdk 도입 + `CommandPalette`(종목 검색·AI 묻기·탭 이동) + `useKeyboardShortcuts`(⌘K/`/`/1~5/`g h|p|c|m|s`). 입력 필드 안에서는 chord/숫자 단축키 무시.
 - 2026-05-27 AI RealClient 실 구현. `anthropic-sdk-go` v1.45 어댑터 — Messages.NewStreaming + adaptive thinking(Sonnet 4.6·Opus 4.6/4.7) + prompt caching(system+tools) + tool_use 누적/emit + ctx.Done 감시. 사용자가 ANTHROPIC_API_KEY 설정 시 즉시 실 채팅 활성.
 - 2026-05-26 W5 전체 완료. 마켓 탭(`/app/market`) — KR/US 지수·환율·경제 지표 4종 카드 + 관심 종목 editor + AdSlot. recharts 도입(LineChartCard·Sparkline). history API 3 라우트(prices·indicators·fx) + 인덱스 일봉 cron 확장(`*-IDX` exchange 포함). 포트폴리오 행 7일 스파크라인(batch fetch). watchlist backend asset_class 가드. Phase 1 핵심 완료.
 - 2026-05-25 W4 전체 완료. AI 채팅 — Mock·Stub 클라이언트 + 9개 도구 + SSE 스트리밍(tool routing turn별 메시지 묶음, max depth 8, session_id in done) + 사용량 추적(월 30회·50K/10K·Opus 1회) + 일일 브리핑 cron(사용자 hash 분단위 분산) + 채팅 UI(세션 리스트·메시지·도구 인디케이터·입력·사용량 배지) + 끊김 처리(이어서 받기). dev에서 API 키 없이 Mock으로 전 흐름 검증 가능.
