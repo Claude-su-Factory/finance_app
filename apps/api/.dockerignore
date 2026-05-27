@@ -1,0 +1,8 @@
+.git
+.gitignore
+README.md
+*.md
+*_test.go
+testdata/
+.vscode/
+.idea/
