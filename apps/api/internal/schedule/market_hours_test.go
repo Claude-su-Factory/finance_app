@@ -29,19 +29,24 @@ func TestIsKRMarketOpen(t *testing.T) {
 }
 
 func TestIsUSMarketOpen(t *testing.T) {
-	loc, _ := time.LoadLocation("Asia/Seoul")
+	kst, _ := time.LoadLocation("Asia/Seoul")
 	cases := []struct {
 		name string
 		t    time.Time
 		want bool
 	}{
-		{"평일 KST 23:30 (US 개장)", time.Date(2025, 12, 2, 23, 30, 0, 0, loc), true},
-		{"평일 KST 23:29", time.Date(2025, 12, 2, 23, 29, 0, 0, loc), false},
-		{"평일 익일 KST 05:00", time.Date(2025, 12, 3, 5, 0, 0, 0, loc), true},
-		{"평일 익일 KST 06:00 (마감)", time.Date(2025, 12, 3, 6, 0, 0, 0, loc), true},
-		{"평일 익일 KST 06:01", time.Date(2025, 12, 3, 6, 1, 0, 0, loc), false},
-		{"토요일 KST 02:00 (NY 금요일 장중 가능하나 보수적 OFF)", time.Date(2025, 11, 29, 2, 0, 0, 0, loc), false},
-		{"일요일 KST 02:00", time.Date(2025, 11, 30, 2, 0, 0, 0, loc), false},
+		// EST (UTC-5, 12월): KST 23:30 ↔ NY 09:30
+		{"EST 평일 KST 23:30 (NY 09:30 개장)", time.Date(2025, 12, 2, 23, 30, 0, 0, kst), true},
+		{"EST 평일 KST 23:29 (NY 09:29)", time.Date(2025, 12, 2, 23, 29, 0, 0, kst), false},
+		{"EST 익일 KST 05:00 (NY 전일 15:00)", time.Date(2025, 12, 3, 5, 0, 0, 0, kst), true},
+		{"EST 익일 KST 06:00 (NY 전일 16:00 마감)", time.Date(2025, 12, 3, 6, 0, 0, 0, kst), true},
+		{"EST 익일 KST 06:01 (NY 전일 16:01)", time.Date(2025, 12, 3, 6, 1, 0, 0, kst), false},
+		// EDT (UTC-4, 8월): KST 22:30 ↔ NY 09:30 — DST 자동 적용 확인
+		{"EDT 평일 KST 22:30 (NY 09:30 개장)", time.Date(2025, 8, 4, 22, 30, 0, 0, kst), true},
+		{"EDT 평일 KST 22:29 (NY 09:29)", time.Date(2025, 8, 4, 22, 29, 0, 0, kst), false},
+		// 토·일 (NY 기준)
+		{"KST 토요일 02:00 (NY 금요일 12:00 — 장중)", time.Date(2025, 11, 29, 2, 0, 0, 0, kst), true},
+		{"KST 일요일 02:00 (NY 토요일 12:00)", time.Date(2025, 11, 30, 2, 0, 0, 0, kst), false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

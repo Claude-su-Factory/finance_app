@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -180,6 +181,18 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 				writeSSE(w, flusher, "error", ev.Data)
 				return
 			}
+		}
+
+		// 마지막 turn(도구 호출 없음)이고 텍스트 응답이 있으면 disclaimer 강제 부착 (spec §5).
+		// systemPrompt 의존만으로는 모델이 누락할 수 있어 핸들러 단에서 보장.
+		// SSE token으로도 emit해 사용자 화면에 반영.
+		isFinalTurn := len(turnToolUses) == 0
+		if isFinalTurn && turnText != "" && !strings.Contains(turnText, "데이터 기준") {
+			loc, _ := time.LoadLocation("Asia/Seoul")
+			stamp := time.Now().In(loc).Format("2006-01-02 15:04")
+			disclaimer := fmt.Sprintf("\n\n(데이터 기준: %s KST, 시세 지연 15분)", stamp)
+			writeSSE(w, flusher, "token", map[string]any{"text": disclaimer})
+			turnText += disclaimer
 		}
 
 		// turn 종료 — assistant 메시지 1개 영속화

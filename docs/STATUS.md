@@ -106,8 +106,8 @@
 - **Go 1.25 강제**: pgx/v5 v5.9.2가 Go 1.25 요구. Task 14 Dockerfile · Task 15 CI 모두 `golang:1.25-alpine` / `go-version: "1.25"` 사용 필요
 - **Supabase Auth JWT secret**: CLI v2.98이 legacy 키 노출 안 함. 사용자가 dashboard에서 "Legacy JWT Secret" 활성화 필요. JWKS 마이그레이션 백로그
 - **KOSDAQ 종목 cron 일봉 — 부분 해결 (W5)**: `JobUpdateKRPrices`가 W5에서 `KOSPI`/`KOSDAQ` exchange 매칭으로 확장. KIND에서 적재된 종목의 exchange가 정확히 `KOSPI`/`KOSDAQ`이면 cron이 일별 갱신. 단, 실 KIND 적재 결과 확인 필요 (`-market KOSDAQ` 백필 후 exchange 값 점검)
-- **US 장중 NY Friday 후반 세션 누락**: `IsUSMarketOpen`이 토요일 일괄 false. KST 토요일 새벽 NY Friday 정규장(quotes 분 단위 폴링) skip. 일봉(prices)은 06:00 cron이 별도 처리 → 데이터 손실 없음
-- **US 장중 DST 미반영**: KST 23:30~06:00 고정. 미국 일광절약시간 기간 30분 어긋남
+- ~~**US 장중 NY Friday 후반 세션 누락**~~ — **2026-05-27 해결**: `IsUSMarketOpen`을 NY 타임존 기반으로 변경. KST 토요일 새벽이 NY 금요일 장중이면 자동 true.
+- ~~**US 장중 DST 미반영**~~ — **2026-05-27 해결**: `time.LoadLocation("America/New_York")` 사용 → DST 자동 적용 (EST/EDT 전환).
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
 - ~~**포트폴리오 우측 sliding panel 미구현**~~ — **2026-05-27 해결**: HoldingDetailPanel — 행 클릭 시 우측 슬라이드, 30일 차트 + 보유 상세 + 수정/삭제 액션. ESC·backdrop 닫기, 선택 행 하이라이트.
 - **AdSense 미가입**: AdSlot은 `NEXT_PUBLIC_ENABLE_ADS=false` 기본 → placeholder만. 가입자 100명·일평균 PV 500 도달 시 Phase 2에서 활성
@@ -115,10 +115,11 @@
 - **AI 컨텍스트 요약 미구현**: 20+ 메시지 시 placeholder만, Haiku 요약 부재. v2 검토
 - **일일 브리핑 도구 호출 없음**: MVP는 단순 1턴 호출. spec §10-8의 "보유 자산+어제 시세 입력"은 system prompt에 텍스트로만 — 도구 호출 통합은 v2
 - **사용량 토큰 turn-by-turn 누적 단순화**: 마지막 turn row에 누적 합계를 저장. turn별 분리 metrics는 v2
-- **disclaimer 강제 부착 system prompt 의존**: spec §5의 "(데이터 기준: ...)" 부착은 systemPrompt에만 명시. 핸들러 단 post-process 강제는 v2
+- ~~**disclaimer 강제 부착 system prompt 의존**~~ — **2026-05-27 해결**: chat handler가 마지막 turn(도구 호출 없음) 영속화 직전에 turnText 끝에 `(데이터 기준: ... KST, 시세 지연 15분)` 강제 부착 + SSE token으로 emit. 이미 포함 시 중복 방지.
 
 ## 최근 변경 이력
 
+- 2026-05-27 Tier 1 묶음 fix. (1) chat handler post-process로 disclaimer 강제 부착 — RealClient 응답에도 spec §5 가드레일 보장. (2) `IsUSMarketOpen`을 NY 타임존(`America/New_York`) 기반으로 재구현 — DST 자동 적용 + NY Friday 후반 세션 자동 포함. 테스트에 EDT 케이스 추가.
 - 2026-05-27 포트폴리오 sliding panel. 행 클릭 시 우측에서 슬라이드인하는 상세 패널 — 헤더(심볼·이름·거래소·통화) + 현재가/손익 + 30일 LineChartCard + 보유 상세(8필드) + 메모 + 수정/삭제 액션. ESC + backdrop 닫기, 행 클릭 ↔ 수정/삭제 버튼은 stopPropagation으로 분리, 선택 행은 bb-accent 하이라이트.
 - 2026-05-27 명령 팔레트 ⌘K + vim-like 단축키. cmdk 도입 + `CommandPalette`(종목 검색·AI 묻기·탭 이동) + `useKeyboardShortcuts`(⌘K/`/`/1~5/`g h|p|c|m|s`). 입력 필드 안에서는 chord/숫자 단축키 무시.
 - 2026-05-27 AI RealClient 실 구현. `anthropic-sdk-go` v1.45 어댑터 — Messages.NewStreaming + adaptive thinking(Sonnet 4.6·Opus 4.6/4.7) + prompt caching(system+tools) + tool_use 누적/emit + ctx.Done 감시. 사용자가 ANTHROPIC_API_KEY 설정 시 즉시 실 채팅 활성.
