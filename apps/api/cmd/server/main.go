@@ -56,7 +56,7 @@ func main() {
 	instrumentHandler := handlers.NewInstrumentHandler(instrumentRepo)
 	holdingRepo := handlers.NewPgHoldingRepo()
 	holdingHandler := handlers.NewHoldingHandler(holdingRepo, pool)
-	watchlistRepo := handlers.NewPgWatchlistRepo(pool)
+	watchlistRepo := handlers.NewPgWatchlistRepo()
 	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo, pool)
 
 	// AI client (env에서 키 가져오기, 빈 값이면 Mock)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
@@ -17,13 +18,16 @@ type fakeWatchlistRepo struct {
 	removeErr error
 }
 
-func (f *fakeWatchlistRepo) List(ctx context.Context, userID string) ([]models.WatchlistItem, error) {
+func (f *fakeWatchlistRepo) List(ctx context.Context, exec db.Executor, userID string) ([]models.WatchlistItem, error) {
+	_ = exec
 	return []models.WatchlistItem{{InstrumentID: "iid-1", Symbol: "KOSPI"}}, nil
 }
-func (f *fakeWatchlistRepo) Add(ctx context.Context, userID, instrumentID string) error {
+func (f *fakeWatchlistRepo) Add(ctx context.Context, exec db.Executor, userID, instrumentID string) error {
+	_ = exec
 	return f.addErr
 }
-func (f *fakeWatchlistRepo) Remove(ctx context.Context, userID, instrumentID string) error {
+func (f *fakeWatchlistRepo) Remove(ctx context.Context, exec db.Executor, userID, instrumentID string) error {
+	_ = exec
 	return f.removeErr
 }
 

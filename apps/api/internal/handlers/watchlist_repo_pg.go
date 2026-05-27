@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
 
@@ -14,21 +14,17 @@ var ErrWatchlistNotFound = errors.New("watchlist item not found")
 var ErrInstrumentRefMissing = errors.New("referenced instrument not found")
 
 type WatchlistRepo interface {
-	List(ctx context.Context, userID string) ([]models.WatchlistItem, error)
-	Add(ctx context.Context, userID, instrumentID string) error
-	Remove(ctx context.Context, userID, instrumentID string) error
+	List(ctx context.Context, exec db.Executor, userID string) ([]models.WatchlistItem, error)
+	Add(ctx context.Context, exec db.Executor, userID, instrumentID string) error
+	Remove(ctx context.Context, exec db.Executor, userID, instrumentID string) error
 }
 
-type PgWatchlistRepo struct {
-	pool *pgxpool.Pool
-}
+type PgWatchlistRepo struct{}
 
-func NewPgWatchlistRepo(pool *pgxpool.Pool) *PgWatchlistRepo {
-	return &PgWatchlistRepo{pool: pool}
-}
+func NewPgWatchlistRepo() *PgWatchlistRepo { return &PgWatchlistRepo{} }
 
-func (r *PgWatchlistRepo) List(ctx context.Context, userID string) ([]models.WatchlistItem, error) {
-	rows, err := r.pool.Query(ctx, `
+func (r *PgWatchlistRepo) List(ctx context.Context, exec db.Executor, userID string) ([]models.WatchlistItem, error) {
+	rows, err := exec.Query(ctx, `
 		select
 		  w.instrument_id::text, w.added_at,
 		  i.symbol, i.exchange, i.name, i.asset_class, i.currency,
@@ -54,8 +50,8 @@ func (r *PgWatchlistRepo) List(ctx context.Context, userID string) ([]models.Wat
 	return out, rows.Err()
 }
 
-func (r *PgWatchlistRepo) Add(ctx context.Context, userID, instrumentID string) error {
-	_, err := r.pool.Exec(ctx, `
+func (r *PgWatchlistRepo) Add(ctx context.Context, exec db.Executor, userID, instrumentID string) error {
+	_, err := exec.Exec(ctx, `
 		insert into public.watchlist (user_id, instrument_id)
 		values ($1, $2)
 	`, userID, instrumentID)
@@ -72,8 +68,8 @@ func (r *PgWatchlistRepo) Add(ctx context.Context, userID, instrumentID string) 
 	return err
 }
 
-func (r *PgWatchlistRepo) Remove(ctx context.Context, userID, instrumentID string) error {
-	ct, err := r.pool.Exec(ctx, `delete from public.watchlist where user_id = $1 and instrument_id = $2`, userID, instrumentID)
+func (r *PgWatchlistRepo) Remove(ctx context.Context, exec db.Executor, userID, instrumentID string) error {
+	ct, err := exec.Exec(ctx, `delete from public.watchlist where user_id = $1 and instrument_id = $2`, userID, instrumentID)
 	if err != nil {
 		return err
 	}
