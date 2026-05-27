@@ -9,6 +9,8 @@
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — 다음 작업은 무엇인가
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 시스템 구성 및 핵심 설계 결정 (Why 포함)
 - [`docs/AGENTS.md`](docs/AGENTS.md) — 에이전트 팀 구성 및 디스패치 규칙
+- [`docs/DEPLOY.md`](docs/DEPLOY.md) — Supabase·Fly·Vercel·Sentry·PostHog·GitHub Actions 배포 가이드
+- [`docs/E2E_SMOKE.md`](docs/E2E_SMOKE.md) — 배포 직후 골든패스 수동 스모크 시나리오
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — 기능별 상세 설계 문서
 - [`docs/superpowers/plans/`](docs/superpowers/plans/) — 기능별 구현 계획
 

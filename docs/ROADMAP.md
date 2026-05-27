@@ -2,11 +2,17 @@
 
 ## 현재 추천 다음 작업
 
-Phase 1 핵심 5주(W1~W5) + 사용자 JWT 풀 전환 + UX 후반 작업(AI RealClient·명령 팔레트·sliding panel)이 완료. 남은 작업은 외부 셋업 + 일부 후속 정합성 작업:
+Phase 1 핵심 + 모든 코드 작업 완료. **남은 항목은 사용자가 직접 셋팅해야 하는 외부 계정·키 발급뿐**:
 
-1. **W1 외부 셋업 (T13~T16)** — Sentry/PostHog DSN + Fly/Vercel 배포 + GitHub Actions + 풀 E2E
-2. **AI 도구 호출 JWT 전파** — chat tool routing의 `portfolio`/`search`/`quote` 도구가 슈퍼유저 풀로 사용자 데이터 read 중. 도구 시그니처에 `db.Executor` 인자 추가 + chat handler에서 `db.AsUser` wrap. spec §10-1 완전 정합.
-3. **Profile handler 통합 테스트** — fake repo 외 testcontainers-go 기반 실제 Postgres 통합 테스트
+1. **Supabase 프로덕션 프로젝트** — region `ap-northeast-2` 생성 + `supabase db push` → DATABASE_URL·SUPABASE_JWT_SECRET 확보 (`docs/DEPLOY.md` §2)
+2. **Fly.io API 배포** — 계정 + `flyctl secrets set` + `flyctl deploy` (`docs/DEPLOY.md` §3)
+3. **Vercel Next.js 배포** — git integration 연결 + env 등록 (`docs/DEPLOY.md` §4)
+4. **Sentry + PostHog 가입** — DSN/Key 발급 후 환경변수 주입 (`docs/DEPLOY.md` §5·§6)
+5. **GitHub Secrets 등록** — `FLY_API_TOKEN` 등 (`docs/DEPLOY.md` §7)
+6. **E2E 스모크 검증** — 배포 직후 `docs/E2E_SMOKE.md` 시나리오 수동 통과
+7. **Anthropic API 키 발급** — production 키 → Fly secrets에 주입
+
+코드 후속 작업은 Phase 1에 없음. Phase 2 항목은 아래 표 참조.
 
 ## Phase 0 — 스펙 (현재)
 
@@ -25,9 +31,8 @@ Phase 1 핵심 5주(W1~W5) + 사용자 JWT 풀 전환 + UX 후반 작업(AI Real
 
 | Tier | 작업 | 예정 |
 |---|---|---|
-| 1 | W1-T13~T16 외부 셋업 (Sentry·PostHog·Fly·Vercel·CI/CD·풀 E2E) | 후속 |
-| 2 | AI 도구 호출 JWT 전파 (spec §10-1) | 후속 |
-| 3 | Profile handler 통합 테스트 (testcontainers-go) | 후속 |
+| — | (모든 코드 작업 완료) | — |
+| 1 | W1 외부 계정 셋업 (사용자 액션) | 사용자 |
 
 ## Phase 2 — 확장 (MVP 출시 후)
 
