@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
@@ -52,10 +53,12 @@ type fakeHoldingRepo struct {
 	created   *models.Holding
 }
 
-func (f *fakeHoldingRepo) List(ctx context.Context, userID string) ([]models.HoldingEnriched, error) {
+func (f *fakeHoldingRepo) List(ctx context.Context, exec db.Executor, userID string) ([]models.HoldingEnriched, error) {
+	_ = exec
 	return []models.HoldingEnriched{}, nil
 }
-func (f *fakeHoldingRepo) Create(ctx context.Context, userID, instrumentID string, qty, avgCost float64, openedAt *string, note *string) (*models.Holding, error) {
+func (f *fakeHoldingRepo) Create(ctx context.Context, exec db.Executor, userID, instrumentID string, qty, avgCost float64, openedAt *string, note *string) (*models.Holding, error) {
+	_ = exec
 	if f.createErr != nil {
 		return nil, f.createErr
 	}
@@ -63,10 +66,12 @@ func (f *fakeHoldingRepo) Create(ctx context.Context, userID, instrumentID strin
 	f.created = h
 	return h, nil
 }
-func (f *fakeHoldingRepo) Update(ctx context.Context, userID, id string, patch map[string]any) (*models.Holding, error) {
+func (f *fakeHoldingRepo) Update(ctx context.Context, exec db.Executor, userID, id string, patch map[string]any) (*models.Holding, error) {
+	_ = exec
 	return &models.Holding{ID: id}, nil
 }
-func (f *fakeHoldingRepo) Delete(ctx context.Context, userID, id string) error {
+func (f *fakeHoldingRepo) Delete(ctx context.Context, exec db.Executor, userID, id string) error {
+	_ = exec
 	return f.deleteErr
 }
 

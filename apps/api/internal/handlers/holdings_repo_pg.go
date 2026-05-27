@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
 
@@ -15,24 +15,20 @@ var ErrHoldingNotFound = errors.New("holding not found")
 var ErrHoldingConflict = errors.New("holding already exists for this instrument")
 
 type HoldingRepo interface {
-	List(ctx context.Context, userID string) ([]models.HoldingEnriched, error)
-	Create(ctx context.Context, userID, instrumentID string, qty, avgCost float64, openedAt *string, note *string) (*models.Holding, error)
-	Update(ctx context.Context, userID, id string, patch map[string]any) (*models.Holding, error)
-	Delete(ctx context.Context, userID, id string) error
+	List(ctx context.Context, exec db.Executor, userID string) ([]models.HoldingEnriched, error)
+	Create(ctx context.Context, exec db.Executor, userID, instrumentID string, qty, avgCost float64, openedAt *string, note *string) (*models.Holding, error)
+	Update(ctx context.Context, exec db.Executor, userID, id string, patch map[string]any) (*models.Holding, error)
+	Delete(ctx context.Context, exec db.Executor, userID, id string) error
 }
 
-type PgHoldingRepo struct {
-	pool *pgxpool.Pool
-}
+type PgHoldingRepo struct{}
 
-func NewPgHoldingRepo(pool *pgxpool.Pool) *PgHoldingRepo {
-	return &PgHoldingRepo{pool: pool}
-}
+func NewPgHoldingRepo() *PgHoldingRepo { return &PgHoldingRepo{} }
 
 // List는 holdings + instruments + 최신 quotes를 join하여 enrichment 전 상태로 반환.
 // 가격·환율 환산·비중 계산은 handler에서 처리.
-func (r *PgHoldingRepo) List(ctx context.Context, userID string) ([]models.HoldingEnriched, error) {
-	rows, err := r.pool.Query(ctx, `
+func (r *PgHoldingRepo) List(ctx context.Context, exec db.Executor, userID string) ([]models.HoldingEnriched, error) {
+	rows, err := exec.Query(ctx, `
 		select
 		  h.id::text, h.instrument_id::text, h.quantity::float8, h.avg_cost::float8,
 		  h.opened_at, h.note, h.created_at, h.updated_at,
@@ -65,8 +61,8 @@ func (r *PgHoldingRepo) List(ctx context.Context, userID string) ([]models.Holdi
 	return out, rows.Err()
 }
 
-func (r *PgHoldingRepo) Create(ctx context.Context, userID, instrumentID string, qty, avgCost float64, openedAt *string, note *string) (*models.Holding, error) {
-	row := r.pool.QueryRow(ctx, `
+func (r *PgHoldingRepo) Create(ctx context.Context, exec db.Executor, userID, instrumentID string, qty, avgCost float64, openedAt *string, note *string) (*models.Holding, error) {
+	row := exec.QueryRow(ctx, `
 		insert into public.holdings (user_id, instrument_id, quantity, avg_cost, opened_at, note)
 		values ($1, $2, $3, $4, $5, $6)
 		returning id::text, instrument_id::text, quantity::float8, avg_cost::float8, opened_at, note, created_at, updated_at
@@ -82,7 +78,7 @@ func (r *PgHoldingRepo) Create(ctx context.Context, userID, instrumentID string,
 	return &h, nil
 }
 
-func (r *PgHoldingRepo) Update(ctx context.Context, userID, id string, patch map[string]any) (*models.Holding, error) {
+func (r *PgHoldingRepo) Update(ctx context.Context, exec db.Executor, userID, id string, patch map[string]any) (*models.Holding, error) {
 	sets := []string{}
 	args := []any{}
 	i := 1
@@ -96,7 +92,7 @@ func (r *PgHoldingRepo) Update(ctx context.Context, userID, id string, patch map
 	}
 	if len(sets) == 0 {
 		// 갱신 없음 — 현재 행 반환
-		row := r.pool.QueryRow(ctx, `
+		row := exec.QueryRow(ctx, `
 			select id::text, instrument_id::text, quantity::float8, avg_cost::float8, opened_at, note, created_at, updated_at
 			from public.holdings where id = $1 and user_id = $2
 		`, id, userID)
@@ -116,7 +112,7 @@ func (r *PgHoldingRepo) Update(ctx context.Context, userID, id string, patch map
 		returning id::text, instrument_id::text, quantity::float8, avg_cost::float8, opened_at, note, created_at, updated_at
 	`, strings.Join(sets, ", "), i, i+1)
 
-	row := r.pool.QueryRow(ctx, q, args...)
+	row := exec.QueryRow(ctx, q, args...)
 	var h models.Holding
 	if err := row.Scan(&h.ID, &h.InstrumentID, &h.Quantity, &h.AvgCost, &h.OpenedAt, &h.Note, &h.CreatedAt, &h.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -127,8 +123,8 @@ func (r *PgHoldingRepo) Update(ctx context.Context, userID, id string, patch map
 	return &h, nil
 }
 
-func (r *PgHoldingRepo) Delete(ctx context.Context, userID, id string) error {
-	ct, err := r.pool.Exec(ctx, `delete from public.holdings where id = $1 and user_id = $2`, id, userID)
+func (r *PgHoldingRepo) Delete(ctx context.Context, exec db.Executor, userID, id string) error {
+	ct, err := exec.Exec(ctx, `delete from public.holdings where id = $1 and user_id = $2`, id, userID)
 	if err != nil {
 		return err
 	}

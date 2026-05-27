@@ -54,7 +54,7 @@ func main() {
 	marketHandler := handlers.NewMarketHandler(marketRepo)
 	instrumentRepo := handlers.NewPgInstrumentRepo(pool)
 	instrumentHandler := handlers.NewInstrumentHandler(instrumentRepo)
-	holdingRepo := handlers.NewPgHoldingRepo(pool)
+	holdingRepo := handlers.NewPgHoldingRepo()
 	holdingHandler := handlers.NewHoldingHandler(holdingRepo, pool)
 	watchlistRepo := handlers.NewPgWatchlistRepo(pool)
 	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo, pool)

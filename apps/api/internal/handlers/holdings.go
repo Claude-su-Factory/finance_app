@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -8,17 +9,28 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
 
 type HoldingHandler struct {
 	repo HoldingRepo
-	pool *pgxpool.Pool // FX 환율 조회용
+	pool *pgxpool.Pool // FX 환율 + asset_class 가드용
+	run  txRunner
 }
 
 func NewHoldingHandler(repo HoldingRepo, pool *pgxpool.Pool) *HoldingHandler {
-	return &HoldingHandler{repo: repo, pool: pool}
+	h := &HoldingHandler{repo: repo, pool: pool}
+	if pool == nil {
+		h.run = func(ctx context.Context, fn func(db.Executor) error) error { return fn(nil) }
+		return h
+	}
+	h.run = func(ctx context.Context, fn func(db.Executor) error) error {
+		uid := middleware.UserID(ctx)
+		return db.AsUser(ctx, pool, uid, fn)
+	}
+	return h
 }
 
 // GET /v1/holdings
@@ -28,14 +40,22 @@ func (h *HoldingHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
 		return
 	}
-	items, err := h.repo.List(r.Context(), uid)
+	var items []models.HoldingEnriched
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		got, err := h.repo.List(r.Context(), exec, uid)
+		if err != nil {
+			return err
+		}
+		items = got
+		return nil
+	})
 	if err != nil {
 		slog.Error("holdings list failed", "user", uid, "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
 		return
 	}
 
-	// FX 환산 + 평가액·수익률 계산
+	// FX 환산 + 평가액·수익률 계산 — 슈퍼유저 풀(공개 데이터)
 	rates, err := FetchFXRates(r.Context(), h.pool)
 	if err != nil {
 		slog.Error("fx rates fetch failed", "err", err)
@@ -82,16 +102,27 @@ func (h *HoldingHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// asset_class 가드: INDEX·FX·CASH instrument는 holdings 대상이 아님 (W3 MVP).
-	var assetClass string
-	if err := h.pool.QueryRow(r.Context(), `select asset_class from public.instruments where id = $1`, body.InstrumentID).Scan(&assetClass); err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "instrument not found")
-		return
+	// instruments는 공개 데이터 — 슈퍼유저 풀로 직접 조회.
+	if h.pool != nil {
+		var assetClass string
+		if err := h.pool.QueryRow(r.Context(), `select asset_class from public.instruments where id = $1`, body.InstrumentID).Scan(&assetClass); err != nil {
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "instrument not found")
+			return
+		}
+		if assetClass == "INDEX" || assetClass == "FX" || assetClass == "CASH" {
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "asset_class not supported for holdings: "+assetClass)
+			return
+		}
 	}
-	if assetClass == "INDEX" || assetClass == "FX" || assetClass == "CASH" {
-		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "asset_class not supported for holdings: "+assetClass)
-		return
-	}
-	out, err := h.repo.Create(r.Context(), uid, body.InstrumentID, body.Quantity, body.AvgCost, body.OpenedAt, body.Note)
+	var out *models.Holding
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		o, err := h.repo.Create(r.Context(), exec, uid, body.InstrumentID, body.Quantity, body.AvgCost, body.OpenedAt, body.Note)
+		if err != nil {
+			return err
+		}
+		out = o
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrHoldingConflict) {
 			writeError(w, http.StatusConflict, "CONFLICT", "holding already exists for this instrument; use PATCH to update")
@@ -130,7 +161,15 @@ func (h *HoldingHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "avg_cost must be >= 0")
 		return
 	}
-	out, err := h.repo.Update(r.Context(), uid, id, patch)
+	var out *models.Holding
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		o, err := h.repo.Update(r.Context(), exec, uid, id, patch)
+		if err != nil {
+			return err
+		}
+		out = o
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrHoldingNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "holding not found")
@@ -155,7 +194,10 @@ func (h *HoldingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "id required")
 		return
 	}
-	if err := h.repo.Delete(r.Context(), uid, id); err != nil {
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		return h.repo.Delete(r.Context(), exec, uid, id)
+	})
+	if err != nil {
 		if errors.Is(err, ErrHoldingNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "holding not found")
 			return
