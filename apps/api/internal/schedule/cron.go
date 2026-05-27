@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/quotient/quotient/apps/api/internal/ai"
+	"github.com/quotient/quotient/apps/api/internal/ai/tools"
 	"github.com/quotient/quotient/apps/api/internal/sources/ecos"
 	"github.com/quotient/quotient/apps/api/internal/sources/fred"
 	"github.com/quotient/quotient/apps/api/internal/sources/fx"
@@ -26,7 +27,7 @@ type Deps struct {
 
 // Start registers cron schedules and returns the running cron instance.
 // 호출자가 Stop()으로 graceful shutdown 책임.
-func Start(ctx context.Context, d Deps, aiClient ai.Client) *cron.Cron {
+func Start(ctx context.Context, d Deps, aiClient ai.Client, toolRegistry *tools.Registry) *cron.Cron {
 	// SkipIfStillRunning: 같은 잡이 직전 tick에서 진행 중이면 새 실행 skip.
 	// instruments 잡(KOSPI+KOSDAQ 풀 fetch)이 1분을 넘기더라도 중복 실행 방지.
 	c := cron.New(
@@ -72,7 +73,7 @@ func Start(ctx context.Context, d Deps, aiClient ai.Client) *cron.Cron {
 	})
 	// 일일 브리핑 dispatcher — 매 분 동작 (내부에서 07:00~07:59만 처리)
 	mustAdd(c, "* 7 * * *", "briefings", func() {
-		if err := JobBriefingDispatcher(ctx, d, aiClient); err != nil {
+		if err := JobBriefingDispatcher(ctx, d, aiClient, toolRegistry); err != nil {
 			slog.Error("cron briefings failed", "err", err)
 		}
 	})

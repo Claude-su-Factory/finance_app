@@ -87,7 +87,7 @@ func main() {
 		FX:    fx.NewClient(""),
 		FRED:  fred.NewClient("", cfg.FREDAPIKey),
 		ECOS:  ecos.NewClient("", cfg.ECOSAPIKey),
-	}, aiClient)
+	}, aiClient, toolRegistry)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
