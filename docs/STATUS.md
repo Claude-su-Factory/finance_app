@@ -111,7 +111,7 @@
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
 - **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 Phase 1 후반·v2로 미룸
 - **AdSense 미가입**: AdSlot은 `NEXT_PUBLIC_ENABLE_ADS=false` 기본 → placeholder만. 가입자 100명·일평균 PV 500 도달 시 Phase 2에서 활성
-- **AI RealClient 미구현**: anthropic-sdk-go 어댑터는 stub. 사용자가 ANTHROPIC_API_KEY 설정해도 stub error 반환. claude-api 스킬로 실 SDK 호출 코드 작성 필요 (별도 백로그). 빈 키일 때만 Mock으로 동작
+- ~~**AI RealClient 미구현**~~ — **2026-05-27 해결**: anthropic-sdk-go v1.45 실 구현 완료. `ANTHROPIC_API_KEY` 설정 시 자동 활성, adaptive thinking(4.6/4.7)·prompt caching·tool streaming·SSE 끊김 ctx 감시 모두 포함
 - **AI 컨텍스트 요약 미구현**: 20+ 메시지 시 placeholder만, Haiku 요약 부재. v2 검토
 - **일일 브리핑 도구 호출 없음**: MVP는 단순 1턴 호출. spec §10-8의 "보유 자산+어제 시세 입력"은 system prompt에 텍스트로만 — 도구 호출 통합은 v2
 - **사용량 토큰 turn-by-turn 누적 단순화**: 마지막 turn row에 누적 합계를 저장. turn별 분리 metrics는 v2
@@ -119,6 +119,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-27 AI RealClient 실 구현. `anthropic-sdk-go` v1.45 어댑터 — Messages.NewStreaming + adaptive thinking(Sonnet 4.6·Opus 4.6/4.7) + prompt caching(system+tools) + tool_use 누적/emit + ctx.Done 감시. 사용자가 ANTHROPIC_API_KEY 설정 시 즉시 실 채팅 활성.
 - 2026-05-26 W5 전체 완료. 마켓 탭(`/app/market`) — KR/US 지수·환율·경제 지표 4종 카드 + 관심 종목 editor + AdSlot. recharts 도입(LineChartCard·Sparkline). history API 3 라우트(prices·indicators·fx) + 인덱스 일봉 cron 확장(`*-IDX` exchange 포함). 포트폴리오 행 7일 스파크라인(batch fetch). watchlist backend asset_class 가드. Phase 1 핵심 완료.
 - 2026-05-25 W4 전체 완료. AI 채팅 — Mock·Stub 클라이언트 + 9개 도구 + SSE 스트리밍(tool routing turn별 메시지 묶음, max depth 8, session_id in done) + 사용량 추적(월 30회·50K/10K·Opus 1회) + 일일 브리핑 cron(사용자 hash 분단위 분산) + 채팅 UI(세션 리스트·메시지·도구 인디케이터·입력·사용량 배지) + 끊김 처리(이어서 받기). dev에서 API 키 없이 Mock으로 전 흐름 검증 가능.
 - 2026-05-23 W3 후속 FX fix. `jobs_fx.go`에 EUR_KRW/JPY_KRW derived 계산 추가 (USD_KRW / USD_EUR, USD_KRW / USD_JPY). prev rates에도 동일 적용으로 change_pct 정상화. holdings KRW 환산 정확도 회복.
