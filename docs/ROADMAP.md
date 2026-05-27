@@ -2,13 +2,11 @@
 
 ## 현재 추천 다음 작업
 
-Phase 1 핵심 5주(W1~W5)가 완료. 남은 작업은 외부 셋업·UX 후반 작업:
+Phase 1 핵심 5주(W1~W5) + 사용자 JWT 풀 전환 + UX 후반 작업(AI RealClient·명령 팔레트·sliding panel)이 완료. 남은 작업은 외부 셋업 + 일부 후속 정합성 작업:
 
-1. **AI RealClient 실 구현** — `anthropic-sdk-go` Messages.NewStreaming 통합 (`claude-api` 스킬). 현재는 Mock만 동작
-2. **W1 외부 셋업 (T13~T16)** — Sentry/PostHog DSN + Fly/Vercel 배포 + GitHub Actions + 풀 E2E
-3. **명령 팔레트 (⌘K)** — 종목 검색·탭 이동·"AI에게 묻기"·설정 진입
-4. **키보드 단축키 풀세트** — `1~5` 탭, `/` 검색, `c` 채팅, `g h` 홈 (vim-like)
-5. **포트폴리오 sliding panel** — 선택 행 우측 상세 패널 (스펙 §6)
+1. **W1 외부 셋업 (T13~T16)** — Sentry/PostHog DSN + Fly/Vercel 배포 + GitHub Actions + 풀 E2E
+2. **AI 도구 호출 JWT 전파** — chat tool routing의 `portfolio`/`search`/`quote` 도구가 슈퍼유저 풀로 사용자 데이터 read 중. 도구 시그니처에 `db.Executor` 인자 추가 + chat handler에서 `db.AsUser` wrap. spec §10-1 완전 정합.
+3. **Profile handler 통합 테스트** — fake repo 외 testcontainers-go 기반 실제 Postgres 통합 테스트
 
 ## Phase 0 — 스펙 (현재)
 
@@ -27,11 +25,9 @@ Phase 1 핵심 5주(W1~W5)가 완료. 남은 작업은 외부 셋업·UX 후반 
 
 | Tier | 작업 | 예정 |
 |---|---|---|
-| 1 | AI RealClient 실 구현 (anthropic-sdk-go) | 후속 |
 | 1 | W1-T13~T16 외부 셋업 (Sentry·PostHog·Fly·Vercel·CI/CD·풀 E2E) | 후속 |
-| 2 | 명령 팔레트 (⌘K) | Phase 1 후반 |
-| 2 | 포트폴리오 sliding panel | Phase 1 후반 |
-| 3 | 키보드 단축키 풀세트 | Phase 1 후반 |
+| 2 | AI 도구 호출 JWT 전파 (spec §10-1) | 후속 |
+| 3 | Profile handler 통합 테스트 (testcontainers-go) | 후속 |
 
 ## Phase 2 — 확장 (MVP 출시 후)
 

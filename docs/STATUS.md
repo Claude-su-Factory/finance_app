@@ -1,6 +1,6 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-26
+마지막 업데이트: 2026-05-27
 
 ## 현재 Phase
 
@@ -98,7 +98,8 @@
 
 ## 알려진 결함 / 백로그
 
-- **Go API**: `pgx` 풀이 postgres 슈퍼유저로 연결 — RLS 우회. 현재는 핸들러 `WHERE id = uid` 필터로 격리. W3 이전에 사용자 JWT 기반 쿼리로 전환 결정 필요 (spec §10-1, profile_repo_pg.go TODO)
+- ~~**Go API**: `pgx` 풀이 postgres 슈퍼유저로 연결 — RLS 우회~~ — **2026-05-27 해결**: 사용자 데이터 핸들러(profile/holdings/watchlist/chat/briefing)를 `db.AsUser` JWT 트랜잭션으로 전환. `SET LOCAL role = authenticated` + `request.jwt.claims/.sub` LOCAL 적용으로 Supabase RLS 자동 트리거. cron·도구 레지스트리·공개 read·브리핑 작성은 슈퍼유저 풀 유지(다중 사용자 fan-out). 격리 회귀 가드: `apps/api/internal/db/rls_integration_test.go` 3 케이스 (holdings·watchlist·chat).
+- **AI 도구 호출 JWT 미전파**: chat tool routing 내 `portfolio`/`search`/`quote` 도구가 슈퍼유저 풀로 사용자 데이터 read. handler 단 `uid` 필터로 격리되지만 spec §10-1 완전 정합 위해 도구 시그니처에 `db.Executor` 추가 + chat handler에서 `db.AsUser` wrap 필요. 별도 PR로 분리.
 - **Next.js 미들웨어**: profile fetch가 모든 `/app/*` 요청마다 발생 (N+1). 사용자 100명까지는 무시 가능. 트래픽 증가 시 JWT custom claim 캐싱 검토
 - ~~**Pretendard 폰트 next/font 최적화**~~ — **2026-05-27 해결**: pretendard 패키지의 woff2를 `next/font/local`로 self-host. CSS @import 제거 + preload + display: swap 자동 적용.
 - **Profile handler 통합 테스트**: fake repo만 있고 실제 Postgres 통합 테스트는 W2 testcontainers-go 도입 후
@@ -119,6 +120,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-27 사용자 데이터 핸들러(profile/holdings/watchlist/chat/briefing)를 `db.AsUser` 사용자 JWT 트랜잭션으로 전환. `Executor` 인터페이스 + `set_config('role','authenticated',true)` + `request.jwt.claims/.sub` LOCAL 적용 → Supabase RLS 자동 트리거. 애플리케이션 `WHERE user_id` 필터는 fail-safe 이중 방어로 유지. testcontainers 없이 로컬 Supabase 기반 RLS 격리 통합 테스트 3 케이스 모두 PASS. cron·도구·공개 read는 슈퍼유저 풀 유지.
 - 2026-05-27 STATUS 결함 5건 일괄 fix: KIND 시장별 exchange 적재(KOSDAQ 일봉 정상화), Haiku 컨텍스트 요약, 일일 브리핑 도구 데이터 주입(spec §10-8), Pretendard `next/font/local` 최적화.
 - 2026-05-27 Tier 1 묶음 fix. (1) chat handler post-process로 disclaimer 강제 부착 — RealClient 응답에도 spec §5 가드레일 보장. (2) `IsUSMarketOpen`을 NY 타임존(`America/New_York`) 기반으로 재구현 — DST 자동 적용 + NY Friday 후반 세션 자동 포함. 테스트에 EDT 케이스 추가.
 - 2026-05-27 포트폴리오 sliding panel. 행 클릭 시 우측에서 슬라이드인하는 상세 패널 — 헤더(심볼·이름·거래소·통화) + 현재가/손익 + 30일 LineChartCard + 보유 상세(8필드) + 메모 + 수정/삭제 액션. ESC + backdrop 닫기, 행 클릭 ↔ 수정/삭제 버튼은 stopPropagation으로 분리, 선택 행은 bb-accent 하이라이트.

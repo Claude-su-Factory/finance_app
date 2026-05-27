@@ -44,6 +44,32 @@ graph TB
 - 사용자 데이터 테이블: `user_id = auth.uid()` RLS 강제.
 - 공개 데이터 (instruments·prices·quotes·indicators·instrument_aliases): 인증 사용자 읽기 허용, 쓰기는 service_role 전용.
 
+### 2-A. 사용자 JWT 풀 패턴 (`db.AsUser`)
+
+**결정**: 사용자 데이터 핸들러는 단일 슈퍼유저 pgxpool 위에서 트랜잭션을 열어
+`set_config('role', 'authenticated', true)` + `request.jwt.claims` + `request.jwt.claim.sub`를
+LOCAL 적용한다. cron 잡·도구 레지스트리·공개 read(market/instruments/history)·브리핑 작성 워커는
+슈퍼유저 풀 그대로 사용.
+
+**Why**:
+- 풀을 분리하지 않아 connection 소비를 1배수로 유지(Supabase Free 60 connection 한도 압박 회피).
+- `set_config(_, _, true)`로 LOCAL 적용 — 트랜잭션 종료 시 자동 해제, leak 불가.
+- 애플리케이션 `WHERE user_id = $1` 필터는 fail-safe 이중 방어로 유지.
+- cron·브리핑 작성은 다중 사용자 fan-out이라 단일 사용자 JWT를 가질 수 없음 → 슈퍼유저 풀이 자연스러움.
+
+**How**:
+- `internal/db/executor.go`: `Executor` 인터페이스(=`*pgxpool.Pool` ∪ `pgx.Tx`).
+- `internal/db/userjwt.go`: `AsUser(ctx, pool, userID, fn)` 헬퍼. `claims` JSON + `claim.sub` 폴백 둘 다 set, rollback은 별도 background ctx로.
+- repo는 stateless, 메서드가 `db.Executor` 받음.
+- handler는 `txRunner`(read용) + `runAs`(inline persist용) 클로저로 wrap. `pool == nil` passthrough로 fake repo 테스트 호환.
+- chat handler의 SSE 영속화는 `context.Background()` 기반 새 ctx + `runAs(ctx, uid, fn)` — 사용자 disconnect 후에도 영속화 보장.
+- 보호 대상 테이블: `profiles`, `holdings`, `watchlist`, `chat_sessions`, `chat_messages`, `chat_usage_monthly`, `ai_briefings`.
+- RLS 격리 회귀 가드: `apps/api/internal/db/rls_integration_test.go` (`//go:build integration`).
+
+**비용**: 요청당 BEGIN + set_config*3 + COMMIT = 5 round-trip 추가. 로컬 PG에서는 무시 가능, region 거리에 비례. Vercel→Fly→Supabase 모두 같은 region에 배치 권장.
+
+**범위 외**: AI 도구(portfolio·search·quote)의 사용자 데이터 read는 여전히 슈퍼유저 풀 + handler 단 `user_id` 필터 사용. spec §10-1 완전 정합을 위해서는 도구 시그니처에 `exec db.Executor` 인자 추가 + chat handler tool routing 안에서 `db.AsUser` wrap이 필요. 별도 PR로 분리.
+
 ### 3. 마이데이터 미사용·자금 미보관
 
 **Why**:
