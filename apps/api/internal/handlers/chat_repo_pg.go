@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
 
@@ -24,27 +24,25 @@ const (
 )
 
 type ChatRepo interface {
-	CreateSession(ctx context.Context, userID, title string) (*models.ChatSession, error)
-	ListSessions(ctx context.Context, userID string) ([]models.ChatSession, error)
-	DeleteSession(ctx context.Context, userID, sessionID string) error
-	ListMessages(ctx context.Context, userID, sessionID string) ([]models.ChatMessage, error)
-	AppendMessage(ctx context.Context, sessionID string, m models.ChatMessage) (*models.ChatMessage, error)
-	MarkFinished(ctx context.Context, messageID string) error
-	UnfinishedInSession(ctx context.Context, userID, sessionID string) (*models.ChatMessage, error)
+	CreateSession(ctx context.Context, exec db.Executor, userID, title string) (*models.ChatSession, error)
+	ListSessions(ctx context.Context, exec db.Executor, userID string) ([]models.ChatSession, error)
+	DeleteSession(ctx context.Context, exec db.Executor, userID, sessionID string) error
+	ListMessages(ctx context.Context, exec db.Executor, userID, sessionID string) ([]models.ChatMessage, error)
+	AppendMessage(ctx context.Context, exec db.Executor, sessionID string, m models.ChatMessage) (*models.ChatMessage, error)
+	MarkFinished(ctx context.Context, exec db.Executor, messageID string) error
+	UnfinishedInSession(ctx context.Context, exec db.Executor, userID, sessionID string) (*models.ChatMessage, error)
 
-	GetUsage(ctx context.Context, userID string) (*models.ChatUsageMonthly, error)
-	IncrementUsage(ctx context.Context, userID string, inTok, outTok int, isOpus bool) error
-	CheckLimits(ctx context.Context, userID string, isOpus bool) error
+	GetUsage(ctx context.Context, exec db.Executor, userID string) (*models.ChatUsageMonthly, error)
+	IncrementUsage(ctx context.Context, exec db.Executor, userID string, inTok, outTok int, isOpus bool) error
+	CheckLimits(ctx context.Context, exec db.Executor, userID string, isOpus bool) error
 }
 
-type PgChatRepo struct {
-	pool *pgxpool.Pool
-}
+type PgChatRepo struct{}
 
-func NewPgChatRepo(pool *pgxpool.Pool) *PgChatRepo { return &PgChatRepo{pool: pool} }
+func NewPgChatRepo() *PgChatRepo { return &PgChatRepo{} }
 
-func (r *PgChatRepo) CreateSession(ctx context.Context, userID, title string) (*models.ChatSession, error) {
-	row := r.pool.QueryRow(ctx, `
+func (r *PgChatRepo) CreateSession(ctx context.Context, exec db.Executor, userID, title string) (*models.ChatSession, error) {
+	row := exec.QueryRow(ctx, `
 		insert into public.chat_sessions (user_id, title) values ($1, $2)
 		returning id::text, user_id::text, title, created_at, updated_at
 	`, userID, title)
@@ -55,8 +53,8 @@ func (r *PgChatRepo) CreateSession(ctx context.Context, userID, title string) (*
 	return &s, nil
 }
 
-func (r *PgChatRepo) ListSessions(ctx context.Context, userID string) ([]models.ChatSession, error) {
-	rows, err := r.pool.Query(ctx, `
+func (r *PgChatRepo) ListSessions(ctx context.Context, exec db.Executor, userID string) ([]models.ChatSession, error) {
+	rows, err := exec.Query(ctx, `
 		select id::text, user_id::text, title, created_at, updated_at
 		from public.chat_sessions where user_id = $1 order by updated_at desc
 	`, userID)
@@ -75,8 +73,8 @@ func (r *PgChatRepo) ListSessions(ctx context.Context, userID string) ([]models.
 	return out, rows.Err()
 }
 
-func (r *PgChatRepo) DeleteSession(ctx context.Context, userID, sessionID string) error {
-	ct, err := r.pool.Exec(ctx, `delete from public.chat_sessions where id = $1 and user_id = $2`, sessionID, userID)
+func (r *PgChatRepo) DeleteSession(ctx context.Context, exec db.Executor, userID, sessionID string) error {
+	ct, err := exec.Exec(ctx, `delete from public.chat_sessions where id = $1 and user_id = $2`, sessionID, userID)
 	if err != nil {
 		return err
 	}
@@ -86,9 +84,9 @@ func (r *PgChatRepo) DeleteSession(ctx context.Context, userID, sessionID string
 	return nil
 }
 
-func (r *PgChatRepo) ListMessages(ctx context.Context, userID, sessionID string) ([]models.ChatMessage, error) {
+func (r *PgChatRepo) ListMessages(ctx context.Context, exec db.Executor, userID, sessionID string) ([]models.ChatMessage, error) {
 	// 단일 쿼리 — session 소유권을 JOIN으로 한 번에 검증.
-	rows, err := r.pool.Query(ctx, `
+	rows, err := exec.Query(ctx, `
 		select m.id::text, m.session_id::text, m.role, m.content, m.tool_calls,
 		       m.input_tokens, m.output_tokens, m.model, m.finished_at, m.created_at
 		from public.chat_messages m
@@ -118,7 +116,7 @@ func (r *PgChatRepo) ListMessages(ctx context.Context, userID, sessionID string)
 	// 결과 0건이면 소유권 검증 (404 vs 빈 리스트 구분)
 	if len(out) == 0 {
 		var exists bool
-		if err := r.pool.QueryRow(ctx, `select exists(select 1 from public.chat_sessions where id = $1 and user_id = $2)`, sessionID, userID).Scan(&exists); err != nil {
+		if err := exec.QueryRow(ctx, `select exists(select 1 from public.chat_sessions where id = $1 and user_id = $2)`, sessionID, userID).Scan(&exists); err != nil {
 			return nil, err
 		}
 		if !exists {
@@ -128,12 +126,12 @@ func (r *PgChatRepo) ListMessages(ctx context.Context, userID, sessionID string)
 	return out, nil
 }
 
-func (r *PgChatRepo) AppendMessage(ctx context.Context, sessionID string, m models.ChatMessage) (*models.ChatMessage, error) {
+func (r *PgChatRepo) AppendMessage(ctx context.Context, exec db.Executor, sessionID string, m models.ChatMessage) (*models.ChatMessage, error) {
 	var tool any
 	if len(m.ToolCalls) > 0 {
 		tool = []byte(m.ToolCalls)
 	}
-	row := r.pool.QueryRow(ctx, `
+	row := exec.QueryRow(ctx, `
 		insert into public.chat_messages
 		  (session_id, role, content, tool_calls, input_tokens, output_tokens, model, finished_at)
 		values ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -143,18 +141,18 @@ func (r *PgChatRepo) AppendMessage(ctx context.Context, sessionID string, m mode
 		return nil, err
 	}
 	m.SessionID = sessionID
-	// 세션 updated_at 갱신
-	_, _ = r.pool.Exec(ctx, `update public.chat_sessions set updated_at = now() where id = $1`, sessionID)
+	// 세션 updated_at 갱신 — 같은 트랜잭션 안에서.
+	_, _ = exec.Exec(ctx, `update public.chat_sessions set updated_at = now() where id = $1`, sessionID)
 	return &m, nil
 }
 
-func (r *PgChatRepo) MarkFinished(ctx context.Context, messageID string) error {
-	_, err := r.pool.Exec(ctx, `update public.chat_messages set finished_at = now() where id = $1`, messageID)
+func (r *PgChatRepo) MarkFinished(ctx context.Context, exec db.Executor, messageID string) error {
+	_, err := exec.Exec(ctx, `update public.chat_messages set finished_at = now() where id = $1`, messageID)
 	return err
 }
 
-func (r *PgChatRepo) UnfinishedInSession(ctx context.Context, userID, sessionID string) (*models.ChatMessage, error) {
-	row := r.pool.QueryRow(ctx, `
+func (r *PgChatRepo) UnfinishedInSession(ctx context.Context, exec db.Executor, userID, sessionID string) (*models.ChatMessage, error) {
+	row := exec.QueryRow(ctx, `
 		select m.id::text, m.session_id::text, m.role, m.content, m.tool_calls,
 		       m.input_tokens, m.output_tokens, m.model, m.finished_at, m.created_at
 		from public.chat_messages m
@@ -176,9 +174,9 @@ func (r *PgChatRepo) UnfinishedInSession(ctx context.Context, userID, sessionID 
 	return &m, nil
 }
 
-func (r *PgChatRepo) GetUsage(ctx context.Context, userID string) (*models.ChatUsageMonthly, error) {
+func (r *PgChatRepo) GetUsage(ctx context.Context, exec db.Executor, userID string) (*models.ChatUsageMonthly, error) {
 	ym := time.Now().Format("2006-01")
-	row := r.pool.QueryRow(ctx, `
+	row := exec.QueryRow(ctx, `
 		select user_id::text, year_month, chat_count, input_tokens, output_tokens, opus_count
 		from public.chat_usage_monthly where user_id = $1 and year_month = $2
 	`, userID, ym)
@@ -192,13 +190,13 @@ func (r *PgChatRepo) GetUsage(ctx context.Context, userID string) (*models.ChatU
 	return &u, nil
 }
 
-func (r *PgChatRepo) IncrementUsage(ctx context.Context, userID string, inTok, outTok int, isOpus bool) error {
+func (r *PgChatRepo) IncrementUsage(ctx context.Context, exec db.Executor, userID string, inTok, outTok int, isOpus bool) error {
 	ym := time.Now().Format("2006-01")
 	opusDelta := 0
 	if isOpus {
 		opusDelta = 1
 	}
-	_, err := r.pool.Exec(ctx, `
+	_, err := exec.Exec(ctx, `
 		insert into public.chat_usage_monthly (user_id, year_month, chat_count, input_tokens, output_tokens, opus_count)
 		values ($1, $2, 1, $3, $4, $5)
 		on conflict (user_id, year_month) do update set
@@ -210,8 +208,8 @@ func (r *PgChatRepo) IncrementUsage(ctx context.Context, userID string, inTok, o
 	return err
 }
 
-func (r *PgChatRepo) CheckLimits(ctx context.Context, userID string, isOpus bool) error {
-	u, err := r.GetUsage(ctx, userID)
+func (r *PgChatRepo) CheckLimits(ctx context.Context, exec db.Executor, userID string, isOpus bool) error {
+	u, err := r.GetUsage(ctx, exec, userID)
 	if err != nil {
 		return err
 	}

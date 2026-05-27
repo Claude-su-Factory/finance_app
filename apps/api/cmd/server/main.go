@@ -70,8 +70,8 @@ func main() {
 	tools.RegisterSearch(toolRegistry, toolDeps)
 
 	// Chat·Briefing handler
-	chatRepo := handlers.NewPgChatRepo(pool)
-	chatHandler := handlers.NewChatHandler(chatRepo, aiClient, toolRegistry)
+	chatRepo := handlers.NewPgChatRepo()
+	chatHandler := handlers.NewChatHandler(chatRepo, pool, aiClient, toolRegistry)
 	briefingHandler := handlers.NewBriefingHandler(pool)
 
 	historyRepo := handlers.NewPgHistoryRepo(pool)

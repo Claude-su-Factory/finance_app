@@ -13,6 +13,7 @@ import (
 
 	"github.com/quotient/quotient/apps/api/internal/ai"
 	"github.com/quotient/quotient/apps/api/internal/ai/tools"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
@@ -27,7 +28,8 @@ type fakeChatRepo struct {
 	incCalls  int
 }
 
-func (f *fakeChatRepo) CreateSession(ctx context.Context, userID, title string) (*models.ChatSession, error) {
+func (f *fakeChatRepo) CreateSession(ctx context.Context, exec db.Executor, userID, title string) (*models.ChatSession, error) {
+	_ = exec
 	if f.createErr != nil {
 		return nil, f.createErr
 	}
@@ -35,14 +37,20 @@ func (f *fakeChatRepo) CreateSession(ctx context.Context, userID, title string) 
 	f.sessions = append(f.sessions, s)
 	return &s, nil
 }
-func (f *fakeChatRepo) ListSessions(ctx context.Context, userID string) ([]models.ChatSession, error) {
+func (f *fakeChatRepo) ListSessions(ctx context.Context, exec db.Executor, userID string) ([]models.ChatSession, error) {
+	_ = exec
 	return f.sessions, nil
 }
-func (f *fakeChatRepo) DeleteSession(ctx context.Context, userID, id string) error { return nil }
-func (f *fakeChatRepo) ListMessages(ctx context.Context, userID, sid string) ([]models.ChatMessage, error) {
+func (f *fakeChatRepo) DeleteSession(ctx context.Context, exec db.Executor, userID, id string) error {
+	_ = exec
+	return nil
+}
+func (f *fakeChatRepo) ListMessages(ctx context.Context, exec db.Executor, userID, sid string) ([]models.ChatMessage, error) {
+	_ = exec
 	return f.messages, nil
 }
-func (f *fakeChatRepo) AppendMessage(ctx context.Context, sid string, m models.ChatMessage) (*models.ChatMessage, error) {
+func (f *fakeChatRepo) AppendMessage(ctx context.Context, exec db.Executor, sid string, m models.ChatMessage) (*models.ChatMessage, error) {
+	_ = exec
 	f.appendCnt++
 	m.ID = fmt.Sprintf("msg-%d", f.appendCnt)
 	m.SessionID = sid
@@ -50,18 +58,25 @@ func (f *fakeChatRepo) AppendMessage(ctx context.Context, sid string, m models.C
 	f.messages = append(f.messages, m)
 	return &m, nil
 }
-func (f *fakeChatRepo) MarkFinished(ctx context.Context, id string) error { return nil }
-func (f *fakeChatRepo) UnfinishedInSession(ctx context.Context, uid, sid string) (*models.ChatMessage, error) {
+func (f *fakeChatRepo) MarkFinished(ctx context.Context, exec db.Executor, id string) error {
+	_ = exec
+	return nil
+}
+func (f *fakeChatRepo) UnfinishedInSession(ctx context.Context, exec db.Executor, uid, sid string) (*models.ChatMessage, error) {
+	_ = exec
 	return nil, nil
 }
-func (f *fakeChatRepo) GetUsage(ctx context.Context, uid string) (*models.ChatUsageMonthly, error) {
+func (f *fakeChatRepo) GetUsage(ctx context.Context, exec db.Executor, uid string) (*models.ChatUsageMonthly, error) {
+	_ = exec
 	return &f.usage, nil
 }
-func (f *fakeChatRepo) IncrementUsage(ctx context.Context, uid string, in, out int, opus bool) error {
+func (f *fakeChatRepo) IncrementUsage(ctx context.Context, exec db.Executor, uid string, in, out int, opus bool) error {
+	_ = exec
 	f.incCalls++
 	return nil
 }
-func (f *fakeChatRepo) CheckLimits(ctx context.Context, uid string, opus bool) error {
+func (f *fakeChatRepo) CheckLimits(ctx context.Context, exec db.Executor, uid string, opus bool) error {
+	_ = exec
 	return f.limitErr
 }
 
@@ -79,7 +94,7 @@ func TestStreamChat_TextOnly(t *testing.T) {
 	repo := &fakeChatRepo{}
 	reg := tools.NewRegistry()
 	mock := &ai.MockClient{}
-	h := NewChatHandler(repo, mock, reg)
+	h := NewChatHandler(repo, nil, mock, reg)
 
 	w := httptest.NewRecorder()
 	h.StreamChat(w, chatReq(t, `{"message":"안녕"}`, "user-1"))
@@ -107,7 +122,7 @@ func TestStreamChat_TextOnly(t *testing.T) {
 
 func TestStreamChat_LimitExceeded(t *testing.T) {
 	repo := &fakeChatRepo{limitErr: ErrUsageExceeded}
-	h := NewChatHandler(repo, &ai.MockClient{}, tools.NewRegistry())
+	h := NewChatHandler(repo, nil, &ai.MockClient{}, tools.NewRegistry())
 	w := httptest.NewRecorder()
 	h.StreamChat(w, chatReq(t, `{"message":"hi"}`, "user-1"))
 	if w.Code != http.StatusTooManyRequests {
@@ -117,7 +132,7 @@ func TestStreamChat_LimitExceeded(t *testing.T) {
 
 func TestStreamChat_NoAuth(t *testing.T) {
 	repo := &fakeChatRepo{}
-	h := NewChatHandler(repo, &ai.MockClient{}, tools.NewRegistry())
+	h := NewChatHandler(repo, nil, &ai.MockClient{}, tools.NewRegistry())
 	w := httptest.NewRecorder()
 	h.StreamChat(w, chatReq(t, `{"message":"hi"}`, ""))
 	if w.Code != http.StatusUnauthorized {
@@ -127,7 +142,7 @@ func TestStreamChat_NoAuth(t *testing.T) {
 
 func TestListSessions_Empty(t *testing.T) {
 	repo := &fakeChatRepo{}
-	h := NewChatHandler(repo, &ai.MockClient{}, tools.NewRegistry())
+	h := NewChatHandler(repo, nil, &ai.MockClient{}, tools.NewRegistry())
 	r := httptest.NewRequest(http.MethodGet, "/v1/chat/sessions", nil)
 	r = r.WithContext(middleware.WithUserID(r.Context(), "user-1"))
 	w := httptest.NewRecorder()

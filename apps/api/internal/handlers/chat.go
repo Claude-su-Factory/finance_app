@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/quotient/quotient/apps/api/internal/ai"
 	"github.com/quotient/quotient/apps/api/internal/ai/tools"
+	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
 	"github.com/quotient/quotient/apps/api/internal/models"
 )
@@ -29,12 +31,30 @@ const systemPrompt = `당신은 Quotient의 분석가입니다. 사용자의 보
 
 type ChatHandler struct {
 	repo     ChatRepo
+	pool     *pgxpool.Pool
 	client   ai.Client
 	registry *tools.Registry
+	run      txRunner
+	// runAs는 inline persist용 — 요청 ctx와 무관한 background ctx에서도
+	// 사용자 ID를 명시적으로 받아 트랜잭션을 연다.
+	runAs func(ctx context.Context, uid string, fn func(db.Executor) error) error
 }
 
-func NewChatHandler(repo ChatRepo, client ai.Client, registry *tools.Registry) *ChatHandler {
-	return &ChatHandler{repo: repo, client: client, registry: registry}
+func NewChatHandler(repo ChatRepo, pool *pgxpool.Pool, client ai.Client, registry *tools.Registry) *ChatHandler {
+	h := &ChatHandler{repo: repo, pool: pool, client: client, registry: registry}
+	if pool == nil {
+		h.run = func(ctx context.Context, fn func(db.Executor) error) error { return fn(nil) }
+		h.runAs = func(ctx context.Context, uid string, fn func(db.Executor) error) error { return fn(nil) }
+		return h
+	}
+	h.run = func(ctx context.Context, fn func(db.Executor) error) error {
+		uid := middleware.UserID(ctx)
+		return db.AsUser(ctx, pool, uid, fn)
+	}
+	h.runAs = func(ctx context.Context, uid string, fn func(db.Executor) error) error {
+		return db.AsUser(ctx, pool, uid, fn)
+	}
+	return h
 }
 
 // POST /v1/chat — SSE 스트리밍
@@ -60,7 +80,9 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 한도 체크
-	if err := h.repo.CheckLimits(r.Context(), uid, body.UseOpus); err != nil {
+	if err := h.run(r.Context(), func(exec db.Executor) error {
+		return h.repo.CheckLimits(r.Context(), exec, uid, body.UseOpus)
+	}); err != nil {
 		http.Error(w, err.Error(), http.StatusTooManyRequests)
 		return
 	}
@@ -68,7 +90,15 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 	// 세션 보장
 	if body.SessionID == "" {
 		title := truncateRunes(body.Message, 50)
-		s, err := h.repo.CreateSession(r.Context(), uid, title)
+		var s *models.ChatSession
+		err := h.run(r.Context(), func(exec db.Executor) error {
+			got, err := h.repo.CreateSession(r.Context(), exec, uid, title)
+			if err != nil {
+				return err
+			}
+			s = got
+			return nil
+		})
 		if err != nil {
 			slog.Error("create session failed", "err", err)
 			http.Error(w, "create session failed", http.StatusInternalServerError)
@@ -78,8 +108,15 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 기존 메시지 로드
-	history, err := h.repo.ListMessages(r.Context(), uid, body.SessionID)
-	if err != nil {
+	var history []models.ChatMessage
+	if err := h.run(r.Context(), func(exec db.Executor) error {
+		got, err := h.repo.ListMessages(r.Context(), exec, uid, body.SessionID)
+		if err != nil {
+			return err
+		}
+		history = got
+		return nil
+	}); err != nil {
 		if errors.Is(err, ErrChatSessionNotFound) {
 			http.Error(w, "session not found", http.StatusNotFound)
 			return
@@ -90,11 +127,13 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 사용자 메시지 영속화
-	_, err = h.repo.AppendMessage(r.Context(), body.SessionID, models.ChatMessage{
-		Role: "user", Content: body.Message,
-		FinishedAt: ptrTime(time.Now()),
-	})
-	if err != nil {
+	if err := h.run(r.Context(), func(exec db.Executor) error {
+		_, err := h.repo.AppendMessage(r.Context(), exec, body.SessionID, models.ChatMessage{
+			Role: "user", Content: body.Message,
+			FinishedAt: ptrTime(time.Now()),
+		})
+		return err
+	}); err != nil {
 		slog.Error("append user message failed", "err", err)
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return
@@ -213,14 +252,22 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 			})
 
 			persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			saved, err := h.repo.AppendMessage(persistCtx, body.SessionID, models.ChatMessage{
-				Role:         "assistant",
-				Content:      turnText,
-				ToolCalls:    blocksJSON,
-				InputTokens:  totalInput,
-				OutputTokens: totalOutput,
-				Model:        &model,
-				FinishedAt:   ptrTime(time.Now()),
+			var saved *models.ChatMessage
+			err := h.runAs(persistCtx, uid, func(exec db.Executor) error {
+				s, perr := h.repo.AppendMessage(persistCtx, exec, body.SessionID, models.ChatMessage{
+					Role:         "assistant",
+					Content:      turnText,
+					ToolCalls:    blocksJSON,
+					InputTokens:  totalInput,
+					OutputTokens: totalOutput,
+					Model:        &model,
+					FinishedAt:   ptrTime(time.Now()),
+				})
+				if perr != nil {
+					return perr
+				}
+				saved = s
+				return nil
 			})
 			cancel()
 			if err != nil {
@@ -244,10 +291,13 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 
 		// tool 결과도 DB row로 영속화 (감사·디버깅용 — role='tool')
 		toolPersistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		_, _ = h.repo.AppendMessage(toolPersistCtx, body.SessionID, models.ChatMessage{
-			Role:       "tool",
-			ToolCalls:  resultsJSON,
-			FinishedAt: ptrTime(time.Now()),
+		_ = h.runAs(toolPersistCtx, uid, func(exec db.Executor) error {
+			_, perr := h.repo.AppendMessage(toolPersistCtx, exec, body.SessionID, models.ChatMessage{
+				Role:       "tool",
+				ToolCalls:  resultsJSON,
+				FinishedAt: ptrTime(time.Now()),
+			})
+			return perr
 		})
 		cancel()
 
@@ -263,7 +313,9 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 persist:
 	// 사용량 갱신
 	usageCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	if err := h.repo.IncrementUsage(usageCtx, uid, totalInput, totalOutput, body.UseOpus); err != nil {
+	if err := h.runAs(usageCtx, uid, func(exec db.Executor) error {
+		return h.repo.IncrementUsage(usageCtx, exec, uid, totalInput, totalOutput, body.UseOpus)
+	}); err != nil {
 		slog.Error("usage increment failed", "err", err)
 	}
 	cancel()
@@ -283,7 +335,15 @@ func (h *ChatHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
 		return
 	}
-	sessions, err := h.repo.ListSessions(r.Context(), uid)
+	var sessions []models.ChatSession
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		got, err := h.repo.ListSessions(r.Context(), exec, uid)
+		if err != nil {
+			return err
+		}
+		sessions = got
+		return nil
+	})
 	if err != nil {
 		slog.Error("list sessions failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
@@ -303,7 +363,10 @@ func (h *ChatHandler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "id")
-	if err := h.repo.DeleteSession(r.Context(), uid, id); err != nil {
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		return h.repo.DeleteSession(r.Context(), exec, uid, id)
+	})
+	if err != nil {
 		if errors.Is(err, ErrChatSessionNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "session not found")
 			return
@@ -323,7 +386,15 @@ func (h *ChatHandler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "id")
-	msgs, err := h.repo.ListMessages(r.Context(), uid, id)
+	var msgs []models.ChatMessage
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		got, err := h.repo.ListMessages(r.Context(), exec, uid, id)
+		if err != nil {
+			return err
+		}
+		msgs = got
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, ErrChatSessionNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "session not found")
@@ -347,7 +418,15 @@ func (h *ChatHandler) GetUnfinished(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "id")
-	m, err := h.repo.UnfinishedInSession(r.Context(), uid, id)
+	var m *models.ChatMessage
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		got, err := h.repo.UnfinishedInSession(r.Context(), exec, uid, id)
+		if err != nil {
+			return err
+		}
+		m = got
+		return nil
+	})
 	if err != nil {
 		slog.Error("unfinished load failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
@@ -367,7 +446,15 @@ func (h *ChatHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
 		return
 	}
-	u, err := h.repo.GetUsage(r.Context(), uid)
+	var u *models.ChatUsageMonthly
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		got, err := h.repo.GetUsage(r.Context(), exec, uid)
+		if err != nil {
+			return err
+		}
+		u = got
+		return nil
+	})
 	if err != nil {
 		slog.Error("get usage failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
