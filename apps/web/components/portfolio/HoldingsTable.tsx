@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AddHoldingDialog } from "./AddHoldingDialog";
 import { EditHoldingDialog } from "./EditHoldingDialog";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+import { HoldingDetailPanel } from "./HoldingDetailPanel";
 
 type SortKey = "weight_pct" | "market_value_krw" | "pnl_pct" | "symbol";
 
@@ -23,6 +24,8 @@ export function HoldingsTable() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Holding | null>(null);
   const [sparks, setSparks] = useState<Record<string, { value: number }[]>>({});
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Holding | null>(null);
 
   async function load() {
     try {
@@ -113,8 +116,16 @@ export function HoldingsTable() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((h) => (
-                  <tr key={h.id} className="border-b border-line/50 hover:bg-bg-deep/50">
+                {sorted.map((h) => {
+                  const selected = detailOpen && detailTarget?.id === h.id;
+                  return (
+                  <tr
+                    key={h.id}
+                    onClick={() => { setDetailTarget(h); setDetailOpen(true); }}
+                    className={`border-b border-line/50 cursor-pointer ${
+                      selected ? "bg-bb-accent/10" : "hover:bg-bg-deep/50"
+                    }`}
+                  >
                     <td className="px-3 py-2">
                       <div>{h.symbol}</div>
                       <div className="text-xs text-fg-muted">{h.name}</div>
@@ -135,16 +146,17 @@ export function HoldingsTable() {
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button
-                        onClick={() => { setEditTarget(h); setEditOpen(true); }}
+                        onClick={(e) => { e.stopPropagation(); setEditTarget(h); setEditOpen(true); }}
                         className="text-xs text-fg-muted hover:text-fg mr-2"
                       >수정</button>
                       <button
-                        onClick={() => { setDeleteTarget(h); setDeleteOpen(true); }}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(h); setDeleteOpen(true); }}
                         className="text-xs text-fg-muted hover:text-bb-down"
                       >삭제</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -153,6 +165,13 @@ export function HoldingsTable() {
       <AddHoldingDialog open={addOpen} onOpenChange={setAddOpen} onAdded={() => void load()} />
       <EditHoldingDialog holding={editTarget} open={editOpen} onOpenChange={setEditOpen} onSaved={() => void load()} />
       <DeleteConfirmDialog holding={deleteTarget} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => void load()} />
+      <HoldingDetailPanel
+        holding={detailTarget}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        onEdit={(h) => { setEditTarget(h); setEditOpen(true); }}
+        onDelete={(h) => { setDeleteTarget(h); setDeleteOpen(true); }}
+      />
     </>
   );
 }

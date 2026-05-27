@@ -109,7 +109,7 @@
 - **US 장중 NY Friday 후반 세션 누락**: `IsUSMarketOpen`이 토요일 일괄 false. KST 토요일 새벽 NY Friday 정규장(quotes 분 단위 폴링) skip. 일봉(prices)은 06:00 cron이 별도 처리 → 데이터 손실 없음
 - **US 장중 DST 미반영**: KST 23:30~06:00 고정. 미국 일광절약시간 기간 30분 어긋남
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
-- **포트폴리오 우측 sliding panel 미구현**: 스펙 §6 선택 행 상세 패널은 Phase 1 후반·v2로 미룸
+- ~~**포트폴리오 우측 sliding panel 미구현**~~ — **2026-05-27 해결**: HoldingDetailPanel — 행 클릭 시 우측 슬라이드, 30일 차트 + 보유 상세 + 수정/삭제 액션. ESC·backdrop 닫기, 선택 행 하이라이트.
 - **AdSense 미가입**: AdSlot은 `NEXT_PUBLIC_ENABLE_ADS=false` 기본 → placeholder만. 가입자 100명·일평균 PV 500 도달 시 Phase 2에서 활성
 - ~~**AI RealClient 미구현**~~ — **2026-05-27 해결**: anthropic-sdk-go v1.45 실 구현 완료. `ANTHROPIC_API_KEY` 설정 시 자동 활성, adaptive thinking(4.6/4.7)·prompt caching·tool streaming·SSE 끊김 ctx 감시 모두 포함
 - **AI 컨텍스트 요약 미구현**: 20+ 메시지 시 placeholder만, Haiku 요약 부재. v2 검토
@@ -119,6 +119,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-27 포트폴리오 sliding panel. 행 클릭 시 우측에서 슬라이드인하는 상세 패널 — 헤더(심볼·이름·거래소·통화) + 현재가/손익 + 30일 LineChartCard + 보유 상세(8필드) + 메모 + 수정/삭제 액션. ESC + backdrop 닫기, 행 클릭 ↔ 수정/삭제 버튼은 stopPropagation으로 분리, 선택 행은 bb-accent 하이라이트.
 - 2026-05-27 명령 팔레트 ⌘K + vim-like 단축키. cmdk 도입 + `CommandPalette`(종목 검색·AI 묻기·탭 이동) + `useKeyboardShortcuts`(⌘K/`/`/1~5/`g h|p|c|m|s`). 입력 필드 안에서는 chord/숫자 단축키 무시.
 - 2026-05-27 AI RealClient 실 구현. `anthropic-sdk-go` v1.45 어댑터 — Messages.NewStreaming + adaptive thinking(Sonnet 4.6·Opus 4.6/4.7) + prompt caching(system+tools) + tool_use 누적/emit + ctx.Done 감시. 사용자가 ANTHROPIC_API_KEY 설정 시 즉시 실 채팅 활성.
 - 2026-05-26 W5 전체 완료. 마켓 탭(`/app/market`) — KR/US 지수·환율·경제 지표 4종 카드 + 관심 종목 editor + AdSlot. recharts 도입(LineChartCard·Sparkline). history API 3 라우트(prices·indicators·fx) + 인덱스 일봉 cron 확장(`*-IDX` exchange 포함). 포트폴리오 행 7일 스파크라인(batch fetch). watchlist backend asset_class 가드. Phase 1 핵심 완료.
