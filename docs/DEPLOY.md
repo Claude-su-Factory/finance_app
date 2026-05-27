@@ -130,7 +130,32 @@ Supabase Dashboard로 돌아가서 Auth → URL Configuration에 배포된 Verce
 
 ---
 
-## 7. 운영 점검
+## 7. GitHub Actions CI/CD
+
+`.github/workflows/` 에 3개 workflow가 정의돼 있습니다:
+- `ci.yml` — 모든 PR/push에서 Go·Next.js lint + test + build (secrets 불필요)
+- `deploy-api.yml` — master push 시 `apps/api/**` 변경되면 Fly 자동 배포
+- `deploy-web.yml` — Vercel git integration 사용 시 비활성(권장), CLI 직접 배포 원하면 `if: false` 제거
+
+### GitHub Secrets 등록
+Repository → Settings → Secrets and variables → Actions → New repository secret:
+
+| 키 | 값 | 사용처 |
+|---|---|---|
+| `FLY_API_TOKEN` | `flyctl auth token` 출력 | deploy-api.yml |
+| `VERCEL_TOKEN` | Vercel → Settings → Tokens → Create | deploy-web.yml(optional) |
+| `VERCEL_ORG_ID` | Vercel → Team Settings → General | deploy-web.yml(optional) |
+| `VERCEL_PROJECT_ID` | Vercel → Project Settings → General | deploy-web.yml(optional) |
+
+`flyctl auth token`은 한 번 발급하면 만료 없음 — 노출 시 즉시 revoke 필요.
+
+### Vercel git integration (권장)
+Vercel → Project → Settings → Git → "Connect Git Repository"로 GitHub repo 연결.
+이후 master push → Production 배포, PR → Preview 배포가 자동. `deploy-web.yml`은 그대로 두고 `if: false` 유지.
+
+---
+
+## 8. 운영 점검
 
 - `flyctl status` — 머신 상태
 - `flyctl logs --tail` — 실시간 로그
