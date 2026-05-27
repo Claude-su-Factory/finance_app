@@ -30,12 +30,14 @@ func NewClient(url string) *Client {
 }
 
 // FetchInstruments returns KOSPI or KOSDAQ listings from KIND public HTML download.
-// market: "KOSPI" or "KOSDAQ".
+// market: "KOSPI" or "KOSDAQ" — 적재된 Instrument.Exchange에 정확히 그 값이 들어감.
 // KIND는 ISIN을 노출하지 않으므로 Instrument.ISIN = nil.
 func (c *Client) FetchInstruments(ctx context.Context, market string) ([]models.Instrument, error) {
 	mt := "stockMkt"
+	exchange := "KOSPI"
 	if strings.EqualFold(market, "KOSDAQ") {
 		mt = "kosdaqMkt"
+		exchange = "KOSDAQ"
 	}
 	u := fmt.Sprintf("%s?method=download&searchType=13&marketType=%s", c.url, mt)
 
@@ -59,11 +61,11 @@ func (c *Client) FetchInstruments(ctx context.Context, market string) ([]models.
 		return nil, fmt.Errorf("kind html parse: %w", err)
 	}
 
-	return parseKindTable(doc), nil
+	return parseKindTable(doc, exchange), nil
 }
 
 // parseKindTable walks <tr><td> rows. 0=name 1=market 2=symbol(6자리) 3=sector ...
-func parseKindTable(doc *html.Node) []models.Instrument {
+func parseKindTable(doc *html.Node, exchange string) []models.Instrument {
 	var out []models.Instrument
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
@@ -80,7 +82,7 @@ func parseKindTable(doc *html.Node) []models.Instrument {
 				if len(symbol) == 6 && isAllDigits(symbol) {
 					out = append(out, models.Instrument{
 						Symbol:     symbol,
-						Exchange:   "KRX",
+						Exchange:   exchange,
 						Name:       tds[0],
 						AssetClass: models.AssetKRStock,
 						Currency:   "KRW",

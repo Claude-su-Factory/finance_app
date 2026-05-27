@@ -38,7 +38,7 @@ func JobUpdateInstruments(ctx context.Context, d Deps) error {
 func seedKRAliases(ctx context.Context, d Deps) (int, error) {
 	rows, err := d.Pool.Query(ctx, `
 		select id::text, symbol, name from public.instruments
-		where exchange = 'KRX' and is_active = true
+		where exchange in ('KOSPI', 'KOSDAQ', 'KRX') and is_active = true
 	`)
 	if err != nil {
 		return 0, err

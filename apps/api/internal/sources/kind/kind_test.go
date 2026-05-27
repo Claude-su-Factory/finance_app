@@ -43,7 +43,7 @@ func TestFetchInstruments_ParsesHTML(t *testing.T) {
 	require.Equal(t, 2, len(inst), "잘못된 행은 필터링되어야 함")
 	assert.Equal(t, "005930", inst[0].Symbol)
 	assert.Equal(t, "삼성전자", inst[0].Name)
-	assert.Equal(t, "KRX", inst[0].Exchange)
+	assert.Equal(t, "KOSPI", inst[0].Exchange)
 	assert.Equal(t, "KRW", inst[0].Currency)
 }
 

@@ -105,7 +105,7 @@
 - **stack 버전 변경**: Next.js 16.2.6 + Tailwind v4 (스펙은 15 + v3) — 최신 GA 수용, 스펙 문서 업데이트 필요
 - **Go 1.25 강제**: pgx/v5 v5.9.2가 Go 1.25 요구. Task 14 Dockerfile · Task 15 CI 모두 `golang:1.25-alpine` / `go-version: "1.25"` 사용 필요
 - **Supabase Auth JWT secret**: CLI v2.98이 legacy 키 노출 안 함. 사용자가 dashboard에서 "Legacy JWT Secret" 활성화 필요. JWKS 마이그레이션 백로그
-- **KOSDAQ 종목 cron 일봉 — 부분 해결 (W5)**: `JobUpdateKRPrices`가 W5에서 `KOSPI`/`KOSDAQ` exchange 매칭으로 확장. KIND에서 적재된 종목의 exchange가 정확히 `KOSPI`/`KOSDAQ`이면 cron이 일별 갱신. 단, 실 KIND 적재 결과 확인 필요 (`-market KOSDAQ` 백필 후 exchange 값 점검)
+- ~~**KOSDAQ 종목 cron 일봉 누락**~~ — **2026-05-27 해결**: KIND 어댑터가 `Exchange: "KRX"` 하드코딩하던 것을 시장별로 `"KOSPI"`/`"KOSDAQ"` 적재로 변경. W5 cron 매칭(`KOSPI`/`KOSDAQ` 포함) + `StockYahooSymbol` (.KS/.KQ 분기)와 정합 → KOSDAQ 종목 일봉 정상 갱신. 기존 KRX 적재분은 alias seed 쿼리에서 KRX 호환 유지로 backward compat.
 - ~~**US 장중 NY Friday 후반 세션 누락**~~ — **2026-05-27 해결**: `IsUSMarketOpen`을 NY 타임존 기반으로 변경. KST 토요일 새벽이 NY 금요일 장중이면 자동 true.
 - ~~**US 장중 DST 미반영**~~ — **2026-05-27 해결**: `time.LoadLocation("America/New_York")` 사용 → DST 자동 적용 (EST/EDT 전환).
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
