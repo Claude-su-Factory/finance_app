@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
-import "pretendard/dist/web/variable/pretendardvariable.css";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Pretendard Variable — pretendard 패키지의 woff2를 next/font/local로 self-host.
+// CSS @import 대비 preload + display: swap + 빌드 최적화 적용 (FOIT 회피).
+const pretendard = localFont({
+  src: "../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
+  variable: "--font-pretendard",
+  display: "swap",
+  weight: "45 920", // variable font weight range
 });
 
 export const metadata: Metadata = {
@@ -19,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`${geistMono.variable} dark`}>
+    <html lang="ko" className={`${geistMono.variable} ${pretendard.variable} dark`}>
       <body>{children}</body>
     </html>
   );
