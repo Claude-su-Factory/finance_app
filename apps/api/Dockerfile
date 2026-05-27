@@ -8,14 +8,18 @@ RUN go mod download
 
 COPY . .
 
-# 단일 정적 바이너리 (CGO 비활성). server 한 개만 빌드(backfill은 CLI라 운영 컨테이너에 불필요).
+# 정적 바이너리 2개 (CGO 비활성).
+# - server: HTTP API + cron 워커
+# - backfill: 일회성 CLI (5년 가격 히스토리 등) — `flyctl ssh console -C "/app/backfill"`로 호출
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/backfill ./cmd/backfill
 
 # Runtime stage — distroless (rootless, minimal)
 FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 COPY --from=build /out/server /app/server
+COPY --from=build /out/backfill /app/backfill
 
 EXPOSE 8080
 USER nonroot:nonroot
