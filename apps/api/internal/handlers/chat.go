@@ -124,7 +124,7 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 
 	// Tool routing loop
 	for depth := range MaxToolDepth {
-		windowed := ai.BuildMessages(aiMsgs)
+		windowed := ai.BuildMessages(r.Context(), aiMsgs, h.client)
 		req := ai.ChatRequest{
 			Model:     model,
 			System:    systemPrompt,

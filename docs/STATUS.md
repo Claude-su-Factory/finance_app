@@ -112,7 +112,7 @@
 - ~~**포트폴리오 우측 sliding panel 미구현**~~ — **2026-05-27 해결**: HoldingDetailPanel — 행 클릭 시 우측 슬라이드, 30일 차트 + 보유 상세 + 수정/삭제 액션. ESC·backdrop 닫기, 선택 행 하이라이트.
 - **AdSense 미가입**: AdSlot은 `NEXT_PUBLIC_ENABLE_ADS=false` 기본 → placeholder만. 가입자 100명·일평균 PV 500 도달 시 Phase 2에서 활성
 - ~~**AI RealClient 미구현**~~ — **2026-05-27 해결**: anthropic-sdk-go v1.45 실 구현 완료. `ANTHROPIC_API_KEY` 설정 시 자동 활성, adaptive thinking(4.6/4.7)·prompt caching·tool streaming·SSE 끊김 ctx 감시 모두 포함
-- **AI 컨텍스트 요약 미구현**: 20+ 메시지 시 placeholder만, Haiku 요약 부재. v2 검토
+- ~~**AI 컨텍스트 요약 미구현**~~ — **2026-05-27 해결**: `BuildMessages(ctx, all, summarizer)`로 시그니처 확장. summarizer 주입 시 Haiku로 dropped 메시지 1턴 요약, nil이면 기존 placeholder fallback. chat handler가 `h.client` 그대로 주입 (Mock/Real 무관).
 - **일일 브리핑 도구 호출 없음**: MVP는 단순 1턴 호출. spec §10-8의 "보유 자산+어제 시세 입력"은 system prompt에 텍스트로만 — 도구 호출 통합은 v2
 - **사용량 토큰 turn-by-turn 누적 단순화**: 마지막 turn row에 누적 합계를 저장. turn별 분리 metrics는 v2
 - ~~**disclaimer 강제 부착 system prompt 의존**~~ — **2026-05-27 해결**: chat handler가 마지막 turn(도구 호출 없음) 영속화 직전에 turnText 끝에 `(데이터 기준: ... KST, 시세 지연 15분)` 강제 부착 + SSE token으로 emit. 이미 포함 시 중복 방지.
