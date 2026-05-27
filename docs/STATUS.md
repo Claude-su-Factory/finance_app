@@ -121,6 +121,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-27 정체성 3축 정립 — "실 자산 분석 + Paper Trading + AI 학습". 랜딩 페이지 완전 재작성: 라이브 ticker 띠 + Hero(3축 가치) + Dashboard SVG preview + AI Chat preview(도구 호출 인디케이터) + 4 기능 그리드 + Paper Trading teaser(Phase 2) + 신뢰 카드(안 하는 것 4) + FAQ + 하단 CTA + 확장 footer. 자산 추가 모달·온보딩에 "본인 입력·검증 없음·분석 도구" 안내 박스. 전체 사용자 수익률 랭킹은 영구 불가(자기 신고 데이터 + 투자권유 영역)로 ROADMAP 명시, 후킹은 알파 카드(외부 지수 비교)로 대체.
 - 2026-05-27 수익화 1단계 코드 — AdSense 실 통합(`<ins>` + `adsbygoogle.push`, layout 스크립트 lazy load) + Toss 개인 후원 사이드바 footer 아이콘. 환경변수 미설정 시 둘 다 비활성 → MVP 무료 출시 정합. 노출 정책: 마켓 페이지 하단만(`market_bottom` 슬롯). 사용자가 AdSense 가입 후 `NEXT_PUBLIC_ADSENSE_CLIENT` + `NEXT_PUBLIC_ADSENSE_SLOT_MARKET_BOTTOM` + `NEXT_PUBLIC_TOSS_DONATION_URL` 주입하면 활성.
 - 2026-05-27 W1-T13~T16 코드 부분 완료 (외부 계정 셋업은 사용자 액션 남음). Sentry(go·next) + PostHog(next) SDK 통합 — DSN/Key 미설정 시 no-op. Fly Dockerfile + fly.toml, Vercel vercel.json, GitHub Actions(ci.yml + deploy-api.yml + deploy-web.yml). 가이드 `docs/DEPLOY.md` + 스모크 체크리스트 `docs/E2E_SMOKE.md`.
 - 2026-05-27 AI 도구 호출 JWT 전파. Tool 인터페이스에 `RequiresUserContext()` 추가, 모든 9개 도구가 `db.Executor` 받음. `ExecuteAndSerialize`가 사용자 데이터 도구 4개(portfolio/holdingDetail/calcMetrics/watchlist)만 `db.AsUser` 트랜잭션 wrap → 공개 도구 5개(quote/priceHistory/marketOverview/search/economicIndicator)는 슈퍼유저 풀 그대로. chat tool routing + briefing 워커 호출 wiring 포함. spec §10-1 완전 정합.
