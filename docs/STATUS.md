@@ -95,6 +95,7 @@
 - ✅ W5-T5 마켓 탭 페이지 + KR/US 지수·환율·경제 지표 카드 (`0e07f14`)
 - ✅ W5-T6 watchlist editor + backend asset_class 가드 (`19eea04`)
 - ✅ W5-T7 포트폴리오 행 7일 스파크라인 (batch fetch) (`8c01b38`)
+- ✅ Paper Trading (라이브) — 가상 자금 매매 시뮬레이션. `/app/paper` 페이지, 매매·리셋 모달, 평가액 시계열 차트, 매매 일기 통합.
 
 ## 알려진 결함 / 백로그
 
@@ -121,6 +122,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-28 Paper Trading (라이브) 출시 — 사이드바 📈 신규 탭 + `/app/paper` 별도 페이지. 가상 자금(default ₩1,000만) + 즉시 시장가 체결 + 가중 평균 avg_cost + 매매 이유 → journal_entries auto entry 자동. 리셋 기능(holdings 삭제 + cash 초기화 + transactions active=false 보존). 신규 테이블 3 + RLS 10 정책 + 4 HTTP endpoint(/v1/paper/*) + 12 unit + 4 integration. 평가액 시계열은 transactions replay + 시점별 가격(알파 카드 패턴 재사용). 정체성 spec §1 3축 마지막 축 이행. 백테스트(서브시스템 B)는 별도.
 - 2026-05-28 AI 매매 일기 출시 — Holdings CRUD 통합(reason → auto entry) + `/app/journal` 별도 페이지(manual entry 자유 작성). 자동 월간 회고 cron(매월 1일 07:00 KST 사용자 hash 분단위 분산) + on-demand 분석 버튼(채팅 한도 차감) + 채팅 `analyze_journal` 도구. 신규 테이블 2(`journal_entries`·`analysis_runs`) + RLS 6 정책 + 6 HTTP endpoint(/v1/journal/*) + 7 unit + 2 integration. 사이드바 📓 아이콘 추가. 정체성 spec §3 최우선 차별화 카드 이행.
 - 2026-05-28 알파 카드 출시 — 홈 1행 3번째에 "포트폴리오 vs KOSPI · S&P 500 · 한미 60/40" 비교. 기간 토글 1M/90D/1Y/All, 시점별 환율, backward simulation. 빈 상태(가입 < 7일 + 보유 자산 0) 처리. `internal/portfolio/` 신규 패키지 + `GET /v1/portfolio/alpha` 핸들러 + 9 unit + 1 integration test. 지수 백필 CLI 확장(Task 0). 정체성 spec §2 약속 이행.
 - 2026-05-27 정체성 3축 정립 — "실 자산 분석 + Paper Trading + AI 학습". 랜딩 페이지 완전 재작성: 라이브 ticker 띠 + Hero(3축 가치) + Dashboard SVG preview + AI Chat preview(도구 호출 인디케이터) + 4 기능 그리드 + Paper Trading teaser(Phase 2) + 신뢰 카드(안 하는 것 4) + FAQ + 하단 CTA + 확장 footer. 자산 추가 모달·온보딩에 "본인 입력·검증 없음·분석 도구" 안내 박스. 전체 사용자 수익률 랭킹은 영구 불가(자기 신고 데이터 + 투자권유 영역)로 ROADMAP 명시, 후킹은 알파 카드(외부 지수 비교)로 대체.
