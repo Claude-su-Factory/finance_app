@@ -157,7 +157,7 @@ func backfillIndices(ctx context.Context, pool *pgxpool.Pool, y *yahoo.Client, y
 
 로컬 Supabase 상태에서:
 ```bash
-cd /Users/yuhojin/Desktop/finance/apps/api && set -a; source .env; set +a; go run ./cmd/backfill indices
+cd /Users/yuhojin/Desktop/finance/apps/api && set -a; source .env; set +a; go run ./cmd/backfill --market=INDICES --years=5
 ```
 
 Expected: 5종목 각 ~1,250 bars 적재. 검증:
@@ -172,7 +172,7 @@ psql "$DATABASE_URL" -c "select i.symbol, count(*) from prices p join instrument
 cd /Users/yuhojin/Desktop/finance && git add apps/api/cmd/backfill apps/api/internal/schedule && git commit -m "feat(backfill): 지수(KOSPI/KOSDAQ/SPX/NDX/DJI) 5년 일봉 적재 — 알파 카드 사전 조건"
 ```
 
-> 운영 배포 시점에서도 prod DB에 1회 실행 필요. `flyctl ssh console -C "/app/backfill indices"` 또는 로컬에서 prod DSN으로.
+> 운영 배포 시점에서도 prod DB에 1회 실행 필요. `flyctl ssh console -C "/app/backfill --market=INDICES --years=5"` 또는 로컬에서 prod DSN으로.
 
 ---
 
