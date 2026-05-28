@@ -25,6 +25,7 @@ func New(
 	readyz http.HandlerFunc,
 	alphaHandler *handlers.AlphaHandler,
 	journalHandler *handlers.JournalHandler,
+	paperHandler *handlers.PaperHandler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
@@ -69,6 +70,11 @@ func New(
 		r.Delete("/v1/journal/entries/{id}", journalHandler.Delete)
 		r.Post("/v1/journal/analyze", journalHandler.Analyze)
 		r.Get("/v1/journal/analyses", journalHandler.ListAnalyses)
+
+		r.Get("/v1/paper/portfolio", paperHandler.GetPortfolio)
+		r.Get("/v1/paper/transactions", paperHandler.ListTx)
+		r.Post("/v1/paper/transactions", paperHandler.Trade)
+		r.Post("/v1/paper/reset", paperHandler.Reset)
 	})
 
 	return r

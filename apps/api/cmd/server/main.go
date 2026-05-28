@@ -90,6 +90,10 @@ func main() {
 	alphaSvc := portfolio.NewService()
 	alphaHandler := handlers.NewAlphaHandler(alphaSvc, pool)
 
+	paperRepo := handlers.NewPgPaperRepo()
+	equityComputer := portfolio.NewEquityComputer(portfolio.PgDeps{})
+	paperHandler := handlers.NewPaperHandler(paperRepo, journalRepo, equityComputer, pool)
+
 	readyz := handlers.ReadyzHandler(pool)
 
 	// cron 워커 시작
@@ -113,6 +117,7 @@ func main() {
 			readyz,
 			alphaHandler,
 			journalHandler,
+			paperHandler,
 		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
