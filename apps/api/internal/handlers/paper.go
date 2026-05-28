@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/middleware"
@@ -267,7 +266,196 @@ func CalcBuyAvgCost(oldQty, oldAvg, addQty, addPrice float64) (newQty, newAvg fl
 	return
 }
 
-// 사용 안 한 import 가드 (chi/strconv/time은 Task 5의 다른 핸들러에서 사용)
-var _ = chi.URLParam
-var _ = strconv.Atoi
-var _ = time.Now
+// GET /v1/paper/portfolio?period=90d
+func (h *PaperHandler) GetPortfolio(w http.ResponseWriter, r *http.Request) {
+	uid := middleware.UserID(r.Context())
+	if uid == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
+		return
+	}
+	period := r.URL.Query().Get("period")
+	days := 90
+	switch period {
+	case "1m":
+		days = 30
+	case "90d", "":
+		days = 90
+	case "1y":
+		days = 365
+	case "all":
+		days = 365 * 5
+	default:
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "period must be 1m|90d|1y|all")
+		return
+	}
+
+	var resp models.PaperPortfolioResponse
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		account, err := h.repo.GetOrCreateAccount(r.Context(), exec, uid)
+		if err != nil {
+			return err
+		}
+		holdings, err := h.repo.ListHoldings(r.Context(), exec, uid)
+		if err != nil {
+			return err
+		}
+		totalEquity := account.CashBalance
+		for i := range holdings {
+			holdings[i] = enrichHolding(r.Context(), h.pool, holdings[i])
+			totalEquity += holdings[i].MarketValueKRW
+		}
+
+		// equity computer 부재 시 (테스트 등) — 빈 시리즈
+		var series []models.EquityPoint
+		if h.equity != nil {
+			txs, err := h.repo.ListActiveTransactionsSince(r.Context(), exec, uid,
+				time.Now().AddDate(0, 0, -days))
+			if err != nil {
+				return err
+			}
+			series, err = h.equity.Compute(r.Context(), h.pool, account, txs, holdings, days)
+			if err != nil {
+				return err
+			}
+		}
+
+		resp = models.PaperPortfolioResponse{
+			Account:      *account,
+			Holdings:     holdings,
+			EquitySeries: series,
+			Summary: models.PaperSummary{
+				TotalEquityKRW: totalEquity,
+				TotalPnLKRW:    totalEquity - account.InitialCash,
+				TotalPnLPct:    pctChange(account.InitialCash, totalEquity),
+			},
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Error("paper portfolio failed", "user", uid, "err", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
+		return
+	}
+	if resp.Holdings == nil {
+		resp.Holdings = []models.PaperHolding{}
+	}
+	if resp.EquitySeries == nil {
+		resp.EquitySeries = []models.EquityPoint{}
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func enrichHolding(ctx context.Context, pool *pgxpool.Pool, h models.PaperHolding) models.PaperHolding {
+	if pool == nil {
+		return h
+	}
+	var price float64
+	_ = pool.QueryRow(ctx, `select coalesce(price, 0)::float8 from public.quotes where instrument_id = $1::uuid`, h.InstrumentID).Scan(&price)
+	h.CurrentPrice = price
+	h.MarketValue = h.Quantity * price
+	fx := 1.0
+	if h.Currency != "KRW" {
+		_ = pool.QueryRow(ctx, `
+			select rate::float8 from public.fx_rates
+			where base = $1 and quote = 'KRW' order by observed_at desc limit 1
+		`, h.Currency).Scan(&fx)
+	}
+	h.MarketValueKRW = h.MarketValue * fx
+	costKRW := h.Quantity * h.AvgCost * fx
+	h.PnLKRW = h.MarketValueKRW - costKRW
+	if costKRW > 0 {
+		h.PnLPct = h.PnLKRW / costKRW * 100
+	}
+	return h
+}
+
+func pctChange(start, end float64) float64 {
+	if start == 0 {
+		return 0
+	}
+	return (end - start) / start * 100
+}
+
+// GET /v1/paper/transactions
+func (h *PaperHandler) ListTx(w http.ResponseWriter, r *http.Request) {
+	uid := middleware.UserID(r.Context())
+	if uid == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit == 0 {
+		limit = 50
+	}
+	var before *time.Time
+	if s := r.URL.Query().Get("before"); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			before = &t
+		}
+	}
+	var txs []models.PaperTransaction
+	var hasMore bool
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		ts, more, err := h.repo.ListTransactions(r.Context(), exec, uid, limit, before)
+		if err != nil {
+			return err
+		}
+		txs = ts
+		hasMore = more
+		return nil
+	})
+	if err != nil {
+		slog.Error("paper list tx failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "load failed")
+		return
+	}
+	if txs == nil {
+		txs = []models.PaperTransaction{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"transactions": txs, "has_more": hasMore})
+}
+
+// POST /v1/paper/reset
+func (h *PaperHandler) Reset(w http.ResponseWriter, r *http.Request) {
+	uid := middleware.UserID(r.Context())
+	if uid == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no user")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1024)
+	var body models.PaperResetRequest
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	initialCash := 10000000.0
+	if body.InitialCash != nil {
+		if *body.InitialCash < 0 || *body.InitialCash > 1e15 {
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "initial_cash out of range")
+			return
+		}
+		initialCash = *body.InitialCash
+	}
+
+	var account *models.PaperAccount
+	err := h.run(r.Context(), func(exec db.Executor) error {
+		if _, err := h.repo.GetOrCreateAccount(r.Context(), exec, uid); err != nil {
+			return err
+		}
+		if err := h.repo.InactivateAllTransactions(r.Context(), exec, uid); err != nil {
+			return err
+		}
+		if err := h.repo.DeleteAllHoldings(r.Context(), exec, uid); err != nil {
+			return err
+		}
+		a, err := h.repo.ResetAccount(r.Context(), exec, uid, initialCash)
+		if err != nil {
+			return err
+		}
+		account = a
+		return nil
+	})
+	if err != nil {
+		slog.Error("paper reset failed", "err", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "reset failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, account)
+}
