@@ -10,6 +10,7 @@ func TestIndexYahooSymbol(t *testing.T) {
 		{"KOSDAQ", "KRX-IDX", "^KQ11"},
 		{"SPX", "NYSE-IDX", "^GSPC"},
 		{"NDX", "NASDAQ-IDX", "^NDX"},
+		{"DJI", "NYSE-IDX", "^DJI"},
 		{"UNKNOWN", "X", ""},
 	}
 	for _, c := range cases {

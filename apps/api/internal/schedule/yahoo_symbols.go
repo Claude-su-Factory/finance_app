@@ -12,6 +12,8 @@ func IndexYahooSymbol(symbol, exchange string) string {
 		return "^GSPC"
 	case symbol == "NDX" && exchange == "NASDAQ-IDX":
 		return "^NDX"
+	case symbol == "DJI" && exchange == "NYSE-IDX":
+		return "^DJI"
 	default:
 		return ""
 	}
