@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, MessageSquare, BarChart3, Settings, Heart } from "lucide-react";
+import { Home, Wallet, MessageSquare, BarChart3, BookOpen, Settings, Heart } from "lucide-react";
 import { clsx } from "clsx";
 
 const items = [
@@ -9,6 +9,7 @@ const items = [
   { href: "/app/portfolio", icon: Wallet, label: "포트폴리오" },
   { href: "/app/chat", icon: MessageSquare, label: "채팅" },
   { href: "/app/market", icon: BarChart3, label: "마켓" },
+  { href: "/app/journal", icon: BookOpen, label: "매매 일기" },
   { href: "/app/settings", icon: Settings, label: "설정" },
 ];
 

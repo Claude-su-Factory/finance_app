@@ -23,6 +23,7 @@ export function AddHoldingDialog({
   const [avgCost, setAvgCost] = useState("");
   const [openedAt, setOpenedAt] = useState("");
   const [note, setNote] = useState("");
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -32,6 +33,7 @@ export function AddHoldingDialog({
     setAvgCost("");
     setOpenedAt("");
     setNote("");
+    setReason("");
     setErr(null);
   }
 
@@ -50,6 +52,7 @@ export function AddHoldingDialog({
         avg_cost: c,
         opened_at: openedAt || undefined,
         note: note || undefined,
+        reason: reason || undefined,
       });
       onAdded();
       reset();
@@ -126,6 +129,19 @@ export function AddHoldingDialog({
               onChange={(e) => setNote(e.target.value)}
               maxLength={200}
             />
+          </div>
+          <div>
+            <Label className="text-xs font-mono">💭 매매 이유 (선택, 200자)</Label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={200}
+              rows={2}
+              className="w-full bg-bg-card border border-line p-2 text-sm font-mono"
+            />
+            <p className="text-[10px] text-fg-muted font-mono mt-1">
+              * 작성 시 매매 일기 자동 기록 — 더 자세히는 일기 페이지에서
+            </p>
           </div>
           {err && <p className="text-bb-down text-xs font-mono">{err}</p>}
         </div>

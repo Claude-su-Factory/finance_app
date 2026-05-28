@@ -21,6 +21,7 @@ export function EditHoldingDialog({
   const [quantity, setQuantity] = useState("");
   const [avgCost, setAvgCost] = useState("");
   const [note, setNote] = useState("");
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export function EditHoldingDialog({
       setQuantity(String(holding.quantity));
       setAvgCost(String(holding.avg_cost));
       setNote(holding.note ?? "");
+      setReason("");
       setErr(null);
     }
   }, [holding]);
@@ -44,7 +46,12 @@ export function EditHoldingDialog({
     if (!(c >= 0)) { setErr("평단가는 0 이상이어야 합니다"); return; }
     setSubmitting(true);
     try {
-      await updateHolding(h.id, { quantity: q, avg_cost: c, note: note || null });
+      await updateHolding(h.id, {
+        quantity: q,
+        avg_cost: c,
+        note: note || null,
+        reason: reason || undefined,
+      });
       onSaved();
       onOpenChange(false);
     } catch (e: unknown) {
@@ -94,6 +101,19 @@ export function EditHoldingDialog({
               onChange={(e) => setNote(e.target.value)}
               maxLength={200}
             />
+          </div>
+          <div>
+            <Label className="text-xs font-mono">💭 변경 사유 (선택, 200자)</Label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={200}
+              rows={2}
+              className="w-full bg-bg-card border border-line p-2 text-sm font-mono"
+            />
+            <p className="text-[10px] text-fg-muted font-mono mt-1">
+              * 작성 시 매매 일기 자동 기록
+            </p>
           </div>
           {err && <p className="text-bb-down text-xs font-mono">{err}</p>}
         </div>

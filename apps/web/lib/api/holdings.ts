@@ -35,6 +35,7 @@ export async function createHolding(input: {
   avg_cost: number;
   opened_at?: string;
   note?: string;
+  reason?: string;
 }): Promise<Holding> {
   const res = await authFetch("/v1/holdings", {
     method: "POST",
@@ -46,7 +47,7 @@ export async function createHolding(input: {
 
 export async function updateHolding(
   id: string,
-  patch: Partial<Pick<Holding, "quantity" | "avg_cost" | "note" | "opened_at">>,
+  patch: Partial<Pick<Holding, "quantity" | "avg_cost" | "note" | "opened_at">> & { reason?: string },
 ): Promise<Holding> {
   const res = await authFetch(`/v1/holdings/${id}`, {
     method: "PATCH",
