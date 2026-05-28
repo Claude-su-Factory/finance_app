@@ -12,6 +12,7 @@
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — Supabase·Fly·Vercel·Sentry·PostHog·GitHub Actions 배포 가이드
 - [`docs/E2E_SMOKE.md`](docs/E2E_SMOKE.md) — 배포 직후 골든패스 수동 스모크 시나리오
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — 기능별 상세 설계 문서
+  - [`2026-05-28-identity-3-pillars.md`](docs/superpowers/specs/2026-05-28-identity-3-pillars.md) — **정체성 3축**(실 자산·Paper·AI 학습) + 수익률 랭킹 영구 불가 + AI 매매 일기 격상 + 안내 의무 (전략 결정 박제)
 - [`docs/superpowers/plans/`](docs/superpowers/plans/) — 기능별 구현 계획
 
 ## 운영 원칙
@@ -31,6 +32,19 @@
 | 코드 개발 (구현) | `superpowers:test-driven-development`, `superpowers:subagent-driven-development` |
 | UI/UX 작업 | `plan-design-review` |
 | 계획 작성 | `superpowers:writing-plans` → 작성 후 **subagent로 자체 검토** |
+
+### ⚠️ 사용자의 빠른 진행 지시는 MANDATORY 생략 신호가 아니다
+
+"쭉 진행해", "한 번에 다 작업해놓고 싶어", "계속 물어보지 말고" 같은 지시는 **실행 속도 요청**이지 **단계 생략 허락이 아니다**.
+다음 단계는 사용자가 명시적으로 생략을 요청하지 않는 한 항상 진행:
+
+1. 새 기능·전략 결정 → `brainstorming` → spec 박제 (`docs/superpowers/specs/`)
+2. 구현 전 → `writing-plans` → subagent 자체 검토 → 사용자 보고
+3. 구현 후 → `requesting-code-review`
+
+사용자의 속도 지시는 "단계는 짧게, 그러나 생략 X"로 해석한다.
+위반 시 사후 박제로라도 spec/plan 작성 (`docs/superpowers/specs/2026-05-28-identity-3-pillars.md` 참고).
+회고는 같은 spec 하단 "검토 이력"에 메타 회고로 박제.
 
 ## 스펙 작성 규칙 (MANDATORY)
 
