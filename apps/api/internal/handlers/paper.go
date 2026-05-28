@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"net/http"
 	"strconv"
 	"time"
@@ -232,9 +233,7 @@ func (h *PaperHandler) Trade(w http.ResponseWriter, r *http.Request) {
 			payload := map[string]any{
 				"code": bizErr.Code, "message": bizErr.Message,
 			}
-			for k, v := range bizErr.Detail {
-				payload[k] = v
-			}
+			maps.Copy(payload, bizErr.Detail)
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": payload})
 			return
 		}
