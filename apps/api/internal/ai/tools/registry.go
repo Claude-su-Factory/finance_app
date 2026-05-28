@@ -99,5 +99,6 @@ func ExecuteAndSerialize(ctx context.Context, r *Registry, pool *pgxpool.Pool, n
 
 // Deps는 모든 도구가 공유하는 의존성.
 type Deps struct {
-	Pool *pgxpool.Pool
+	Pool   *pgxpool.Pool
+	Client ai.Client // analyze_journal 같은 LLM 호출 도구가 사용. 다른 도구는 무시.
 }
