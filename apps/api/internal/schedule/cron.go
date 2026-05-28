@@ -77,9 +77,15 @@ func Start(ctx context.Context, d Deps, aiClient ai.Client, toolRegistry *tools.
 			slog.Error("cron briefings failed", "err", err)
 		}
 	})
+	// 월간 매매 일기 자동 회고 dispatcher — 매 분 동작 (내부에서 매월 1일 07:00~07:59만 처리)
+	mustAdd(c, "* 7 1 * *", "journal_monthly", func() {
+		if err := JobMonthlyJournalDispatcher(ctx, d, aiClient, toolRegistry); err != nil {
+			slog.Error("cron journal_monthly failed", "err", err)
+		}
+	})
 
 	c.Start()
-	slog.Info("cron started", "jobs", 7, "tz", "Asia/Seoul")
+	slog.Info("cron started", "jobs", 8, "tz", "Asia/Seoul")
 	return c
 }
 
