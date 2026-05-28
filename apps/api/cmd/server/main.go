@@ -18,6 +18,7 @@ import (
 	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/handlers"
 	"github.com/quotient/quotient/apps/api/internal/observability"
+	"github.com/quotient/quotient/apps/api/internal/portfolio"
 	"github.com/quotient/quotient/apps/api/internal/router"
 	"github.com/quotient/quotient/apps/api/internal/schedule"
 	"github.com/quotient/quotient/apps/api/internal/sources/ecos"
@@ -83,6 +84,9 @@ func main() {
 	historyRepo := handlers.NewPgHistoryRepo(pool)
 	historyHandler := handlers.NewHistoryHandler(historyRepo)
 
+	alphaSvc := portfolio.NewService()
+	alphaHandler := handlers.NewAlphaHandler(alphaSvc, pool)
+
 	readyz := handlers.ReadyzHandler(pool)
 
 	// cron 워커 시작
@@ -104,6 +108,7 @@ func main() {
 			chatHandler, briefingHandler,
 			historyHandler,
 			readyz,
+			alphaHandler,
 		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,

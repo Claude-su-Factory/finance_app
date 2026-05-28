@@ -23,6 +23,7 @@ func New(
 	briefingHandler *handlers.BriefingHandler,
 	historyHandler *handlers.HistoryHandler,
 	readyz http.HandlerFunc,
+	alphaHandler *handlers.AlphaHandler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
@@ -36,6 +37,7 @@ func New(
 		r.Use(middleware.RequireAuth(verifier))
 		r.Get("/v1/profile", profileHandler.Get)
 		r.Patch("/v1/profile", profileHandler.Patch)
+		r.Get("/v1/portfolio/alpha", alphaHandler.Get)
 		r.Get("/v1/market/ticker", marketHandler.Ticker)
 		r.Get("/v1/instruments/search", instrumentHandler.Search)
 		r.Post("/v1/instruments/select", instrumentHandler.Select)
