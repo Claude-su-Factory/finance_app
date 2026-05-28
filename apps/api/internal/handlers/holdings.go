@@ -15,13 +15,14 @@ import (
 )
 
 type HoldingHandler struct {
-	repo HoldingRepo
-	pool *pgxpool.Pool // FX 환율 + asset_class 가드용
-	run  txRunner
+	repo        HoldingRepo
+	journalRepo JournalRepo  // optional, nil이면 reason 무시
+	pool        *pgxpool.Pool // FX 환율 + asset_class 가드용
+	run         txRunner
 }
 
-func NewHoldingHandler(repo HoldingRepo, pool *pgxpool.Pool) *HoldingHandler {
-	h := &HoldingHandler{repo: repo, pool: pool}
+func NewHoldingHandler(repo HoldingRepo, journalRepo JournalRepo, pool *pgxpool.Pool) *HoldingHandler {
+	h := &HoldingHandler{repo: repo, journalRepo: journalRepo, pool: pool}
 	if pool == nil {
 		h.run = func(ctx context.Context, fn func(db.Executor) error) error { return fn(nil) }
 		return h
@@ -84,6 +85,7 @@ func (h *HoldingHandler) Create(w http.ResponseWriter, r *http.Request) {
 		AvgCost      float64 `json:"avg_cost"`
 		OpenedAt     *string `json:"opened_at,omitempty"` // "YYYY-MM-DD"
 		Note         *string `json:"note,omitempty"`
+		Reason       *string `json:"reason,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "invalid json")
@@ -121,6 +123,17 @@ func (h *HoldingHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out = o
+		if body.Reason != nil && *body.Reason != "" && h.journalRepo != nil {
+			reason := *body.Reason
+			if len([]rune(reason)) > 200 {
+				reason = string([]rune(reason)[:200])
+			}
+			action := "buy"
+			_, _ = h.journalRepo.CreateEntry(r.Context(), exec, uid, "auto", models.JournalEntryCreate{
+				Action:  &action,
+				Content: reason,
+			}, &out.ID)
+		}
 		return nil
 	})
 	if err != nil {
@@ -161,6 +174,12 @@ func (h *HoldingHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "VALIDATION", "avg_cost must be >= 0")
 		return
 	}
+	// reason은 holdings 컬럼이 아니므로 patch map에서 분리해 auto journal entry로 사용.
+	var reason string
+	if v, ok := patch["reason"].(string); ok {
+		reason = v
+	}
+	delete(patch, "reason")
 	var out *models.Holding
 	err := h.run(r.Context(), func(exec db.Executor) error {
 		o, err := h.repo.Update(r.Context(), exec, uid, id, patch)
@@ -168,6 +187,17 @@ func (h *HoldingHandler) Patch(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out = o
+		if reason != "" && h.journalRepo != nil {
+			r2 := reason
+			if len([]rune(r2)) > 200 {
+				r2 = string([]rune(r2)[:200])
+			}
+			action := "other"
+			_, _ = h.journalRepo.CreateEntry(r.Context(), exec, uid, "auto", models.JournalEntryCreate{
+				Action:  &action,
+				Content: r2,
+			}, &out.ID)
+		}
 		return nil
 	})
 	if err != nil {

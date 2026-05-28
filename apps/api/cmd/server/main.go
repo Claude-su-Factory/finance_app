@@ -61,8 +61,10 @@ func main() {
 	marketHandler := handlers.NewMarketHandler(marketRepo)
 	instrumentRepo := handlers.NewPgInstrumentRepo(pool)
 	instrumentHandler := handlers.NewInstrumentHandler(instrumentRepo)
+	journalRepo := handlers.NewPgJournalRepo()
 	holdingRepo := handlers.NewPgHoldingRepo()
-	holdingHandler := handlers.NewHoldingHandler(holdingRepo, pool)
+	holdingHandler := handlers.NewHoldingHandler(holdingRepo, journalRepo, pool)
+	_ = journalRepo // T7에서 NewJournalHandler에 재사용
 	watchlistRepo := handlers.NewPgWatchlistRepo()
 	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo, pool)
 

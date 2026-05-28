@@ -86,7 +86,7 @@ func TestHoldingCreate_ValidationBefore_AssetClassGuard(t *testing.T) {
 	// asset_class 가드는 DB 호출 필요라 fake repo로 도달 못 함.
 	// 여기선 검증 단계까지만 — InstrumentID 누락·quantity·avg_cost·인증.
 	repo := &fakeHoldingRepo{}
-	h := NewHoldingHandler(repo, nil)
+	h := NewHoldingHandler(repo, nil, nil)
 
 	cases := []struct {
 		name string
@@ -117,7 +117,7 @@ func TestHoldingCreate_ValidationBefore_AssetClassGuard(t *testing.T) {
 
 func TestHoldingDelete_NotFound(t *testing.T) {
 	repo := &fakeHoldingRepo{deleteErr: ErrHoldingNotFound}
-	h := NewHoldingHandler(repo, nil)
+	h := NewHoldingHandler(repo, nil, nil)
 	r := reqWithUID(http.MethodDelete, "/v1/holdings/abc", "", "user-1")
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", "abc")
@@ -128,6 +128,21 @@ func TestHoldingDelete_NotFound(t *testing.T) {
 	h.Delete(w, r)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("got %d want 404", w.Code)
+	}
+}
+
+func TestCreateHolding_WithReason_CreatesAutoEntry(t *testing.T) {
+	repo := &fakeHoldingRepo{}
+	jrepo := &fakeJournalRepo{}
+	h := NewHoldingHandler(repo, jrepo, nil)
+	body := `{"instrument_id":"x","quantity":1,"avg_cost":100,"reason":"실적 회복 기대"}`
+	w := httptest.NewRecorder()
+	h.Create(w, reqWithUID(http.MethodPost, "/v1/holdings", body, "user-1"))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status %d body %s", w.Code, w.Body.String())
+	}
+	if jrepo.lastCreateContent != "실적 회복 기대" {
+		t.Errorf("auto entry not created with reason: %v", jrepo.lastCreateContent)
 	}
 }
 
