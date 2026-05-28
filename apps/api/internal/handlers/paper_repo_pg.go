@@ -85,6 +85,9 @@ func (PgPaperRepo) ResetAccount(ctx context.Context, exec db.Executor, userID st
 		returning user_id::text, initial_cash::float8, cash_balance::float8, base_currency, created_at, updated_at
 	`, userID, initialCash)
 	if err := row.Scan(&a.UserID, &a.InitialCash, &a.CashBalance, &a.BaseCurrency, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPaperAccountNotFound
+		}
 		return nil, err
 	}
 	return a, nil
