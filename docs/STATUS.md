@@ -121,6 +121,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-28 AI 매매 일기 출시 — Holdings CRUD 통합(reason → auto entry) + `/app/journal` 별도 페이지(manual entry 자유 작성). 자동 월간 회고 cron(매월 1일 07:00 KST 사용자 hash 분단위 분산) + on-demand 분석 버튼(채팅 한도 차감) + 채팅 `analyze_journal` 도구. 신규 테이블 2(`journal_entries`·`analysis_runs`) + RLS 6 정책 + 6 HTTP endpoint(/v1/journal/*) + 7 unit + 2 integration. 사이드바 📓 아이콘 추가. 정체성 spec §3 최우선 차별화 카드 이행.
 - 2026-05-28 알파 카드 출시 — 홈 1행 3번째에 "포트폴리오 vs KOSPI · S&P 500 · 한미 60/40" 비교. 기간 토글 1M/90D/1Y/All, 시점별 환율, backward simulation. 빈 상태(가입 < 7일 + 보유 자산 0) 처리. `internal/portfolio/` 신규 패키지 + `GET /v1/portfolio/alpha` 핸들러 + 9 unit + 1 integration test. 지수 백필 CLI 확장(Task 0). 정체성 spec §2 약속 이행.
 - 2026-05-27 정체성 3축 정립 — "실 자산 분석 + Paper Trading + AI 학습". 랜딩 페이지 완전 재작성: 라이브 ticker 띠 + Hero(3축 가치) + Dashboard SVG preview + AI Chat preview(도구 호출 인디케이터) + 4 기능 그리드 + Paper Trading teaser(Phase 2) + 신뢰 카드(안 하는 것 4) + FAQ + 하단 CTA + 확장 footer. 자산 추가 모달·온보딩에 "본인 입력·검증 없음·분석 도구" 안내 박스. 전체 사용자 수익률 랭킹은 영구 불가(자기 신고 데이터 + 투자권유 영역)로 ROADMAP 명시, 후킹은 알파 카드(외부 지수 비교)로 대체.
 - 2026-05-27 수익화 1단계 코드 — AdSense 실 통합(`<ins>` + `adsbygoogle.push`, layout 스크립트 lazy load) + Toss 개인 후원 사이드바 footer 아이콘. 환경변수 미설정 시 둘 다 비활성 → MVP 무료 출시 정합. 노출 정책: 마켓 페이지 하단만(`market_bottom` 슬롯). 사용자가 AdSense 가입 후 `NEXT_PUBLIC_ADSENSE_CLIENT` + `NEXT_PUBLIC_ADSENSE_SLOT_MARKET_BOTTOM` + `NEXT_PUBLIC_TOSS_DONATION_URL` 주입하면 활성.
