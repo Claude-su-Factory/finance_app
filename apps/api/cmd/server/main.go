@@ -64,7 +64,6 @@ func main() {
 	journalRepo := handlers.NewPgJournalRepo()
 	holdingRepo := handlers.NewPgHoldingRepo()
 	holdingHandler := handlers.NewHoldingHandler(holdingRepo, journalRepo, pool)
-	_ = journalRepo // T7에서 NewJournalHandler에 재사용
 	watchlistRepo := handlers.NewPgWatchlistRepo()
 	watchlistHandler := handlers.NewWatchlistHandler(watchlistRepo, pool)
 
@@ -73,14 +72,16 @@ func main() {
 
 	// Tool registry
 	toolRegistry := tools.NewRegistry()
-	toolDeps := &tools.Deps{Pool: pool}
+	toolDeps := &tools.Deps{Pool: pool, Client: aiClient}
 	tools.RegisterPortfolio(toolRegistry, toolDeps)
 	tools.RegisterQuote(toolRegistry, toolDeps)
 	tools.RegisterSearch(toolRegistry, toolDeps)
+	tools.RegisterJournal(toolRegistry, toolDeps)
 
 	// Chat·Briefing handler
 	chatRepo := handlers.NewPgChatRepo()
 	chatHandler := handlers.NewChatHandler(chatRepo, pool, aiClient, toolRegistry)
+	journalHandler := handlers.NewJournalHandler(journalRepo, chatRepo, pool, aiClient, toolRegistry)
 	briefingHandler := handlers.NewBriefingHandler(pool)
 
 	historyRepo := handlers.NewPgHistoryRepo(pool)
@@ -111,6 +112,7 @@ func main() {
 			historyHandler,
 			readyz,
 			alphaHandler,
+			journalHandler,
 		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
