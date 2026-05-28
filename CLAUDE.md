@@ -7,6 +7,7 @@
 
 - [`docs/STATUS.md`](docs/STATUS.md) — 현재 어디까지 구현됐나
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — 다음 작업은 무엇인가
+- [`docs/USER_ACTIONS.md`](docs/USER_ACTIONS.md) — **사용자가 직접 해야 하는 작업 트래커** (외부 계정·키·운영 명령). 새 액션 발생 시 즉시 추가 의무
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 시스템 구성 및 핵심 설계 결정 (Why 포함)
 - [`docs/AGENTS.md`](docs/AGENTS.md) — 에이전트 팀 구성 및 디스패치 규칙
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — Supabase·Fly·Vercel·Sentry·PostHog·GitHub Actions 배포 가이드
@@ -72,6 +73,7 @@
 1. `docs/STATUS.md` — 해당 항목 ✅로 이동, "최근 변경 이력" 맨 위에 한 줄 추가, "마지막 업데이트" 갱신
 2. `docs/ROADMAP.md` — 완료 항목 제거, "현재 추천 다음 작업" 재설정
 3. `docs/ARCHITECTURE.md` — 아키텍처 영향 변경에만 반영 (새 컴포넌트·중대 설계 결정, Why/How 필수)
+4. `docs/USER_ACTIONS.md` — **사용자가 직접 해야 하는 신규 액션이 생기면 즉시 등재** (외부 계정·키·운영 명령). 사용자 환경 의존 작업을 코드 변경 안에 묻어두지 말 것
 
 문서 업데이트 없이는 작업이 완료된 것으로 간주하지 않는다.
 
