@@ -55,7 +55,8 @@ type PaperTransactionCreate struct {
 	InstrumentID string  `json:"instrument_id"`
 	Action       string  `json:"action"`
 	Quantity     float64 `json:"quantity"`
-	Reason       *string `json:"reason,omitempty"`
+	// Reason은 paper_transactions DB에 저장되지 않음 — 매매 일기 auto entry 생성에만 사용
+	Reason *string `json:"reason,omitempty"`
 }
 
 // PaperPortfolioResponse — GET /v1/paper/portfolio 응답
