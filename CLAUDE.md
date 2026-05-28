@@ -15,6 +15,7 @@
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — 기능별 상세 설계 문서
   - [`2026-05-28-identity-3-pillars.md`](docs/superpowers/specs/2026-05-28-identity-3-pillars.md) — **정체성 3축**(실 자산·Paper·AI 학습) + 수익률 랭킹 영구 불가 + AI 매매 일기 격상 + 안내 의무 (전략 결정 박제)
   - [`2026-05-28-alpha-card-design.md`](docs/superpowers/specs/2026-05-28-alpha-card-design.md) — **알파 카드** 설계: 홈 1행 3번째에 "포트 vs KOSPI·S&P·한미 60/40" 비교. 기간 토글·시점별 환율·backward simulation
+  - [`2026-05-28-ai-trading-journal-design.md`](docs/superpowers/specs/2026-05-28-ai-trading-journal-design.md) — **AI 매매 일기** 설계: CRUD 통합(auto) + 별도 페이지(manual) 하이브리드. 월간 자동 회고 cron + on-demand 분석 버튼 + 채팅 `analyze_journal` 도구
 - [`docs/superpowers/plans/`](docs/superpowers/plans/) — 기능별 구현 계획
 
 ## 운영 원칙
