@@ -145,3 +145,38 @@ func TestSimulate_DCAplusRebalance_OrderCorrect(t *testing.T) {
 	approx(t, out.Equity[1].Value, 1_800_000, 1e-6, "contribution allocated before rebalance")
 	approx(t, out.TotalContributed, 1_300_000, 1e-6, "totalContributed = 1M + 300k")
 }
+
+func TestXIRR_LumpSum_MatchesCAGR(t *testing.T) {
+	// -1M 투입, 3년 후 +2M 회수 → (2)^(1/3)-1 ≈ 0.259921
+	cfs := []Cashflow{{Amount: -1_000_000, Date: "2021-01-01"}, {Amount: 2_000_000, Date: "2024-01-01"}}
+	r := xirr(cfs)
+	if r == nil {
+		t.Fatalf("xirr returned nil")
+	}
+	approx(t, *r, 0.259921, 1e-4, "lump-sum xirr == cube-root(2)-1")
+}
+
+func TestXIRR_DCA_KnownCashflows(t *testing.T) {
+	// 두 번 투입 후 회수 — 양의 수익. 근에서 NPV≈0 + 양수 수렴 검증.
+	cfs := []Cashflow{
+		{Amount: -1000, Date: "2020-01-01"},
+		{Amount: -1000, Date: "2021-01-01"},
+		{Amount: 2100, Date: "2022-01-01"},
+	}
+	r := xirr(cfs)
+	if r == nil {
+		t.Fatalf("xirr returned nil")
+	}
+	if *r <= 0 {
+		t.Errorf("expected positive return, got %v", *r)
+	}
+	approx(t, xirrNPV(cfs, *r), 0, 1e-3, "NPV at root ≈ 0")
+}
+
+func TestXIRR_NonConverging_ReturnsNull(t *testing.T) {
+	// 부호가 모두 음수 → 해 없음 → nil.
+	cfs := []Cashflow{{Amount: -1000, Date: "2020-01-01"}, {Amount: -1000, Date: "2021-01-01"}}
+	if r := xirr(cfs); r != nil {
+		t.Errorf("expected nil, got %v", *r)
+	}
+}

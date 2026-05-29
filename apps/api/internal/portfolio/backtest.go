@@ -1,6 +1,9 @@
 package portfolio
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 // Rebalance는 리밸런싱 주기 (없음·분기·반기·연).
 type Rebalance int
@@ -204,4 +207,101 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 	cashflows = append(cashflows, Cashflow{Amount: out.FinalEquity, Date: tradingDays[n-1]})
 	out.Cashflows = cashflows
 	return out
+}
+
+func yearFrac(d0, dk string) float64 {
+	a, _ := time.Parse("2006-01-02", d0)
+	b, _ := time.Parse("2006-01-02", dk)
+	return b.Sub(a).Hours() / 24.0 / 365.0
+}
+
+func xirrNPV(cfs []Cashflow, r float64) float64 {
+	if len(cfs) == 0 {
+		return 0
+	}
+	d0 := cfs[0].Date
+	var s float64
+	for _, cf := range cfs {
+		s += cf.Amount / math.Pow(1+r, yearFrac(d0, cf.Date))
+	}
+	return s
+}
+
+func xirrDeriv(cfs []Cashflow, r float64) float64 {
+	if len(cfs) == 0 {
+		return 0
+	}
+	d0 := cfs[0].Date
+	var s float64
+	for _, cf := range cfs {
+		yf := yearFrac(d0, cf.Date)
+		s += cf.Amount * (-yf) / math.Pow(1+r, yf+1)
+	}
+	return s
+}
+
+// xirr — 머니가중 연이율. Newton(초기 0.1, 100회, |f|<1e-6) → 이분법 폴백 [-0.99,10] → nil.
+func xirr(cfs []Cashflow) *float64 {
+	if len(cfs) < 2 {
+		return nil
+	}
+	hasNeg, hasPos := false, false
+	for _, cf := range cfs {
+		if cf.Amount < 0 {
+			hasNeg = true
+		} else if cf.Amount > 0 {
+			hasPos = true
+		}
+	}
+	if !hasNeg || !hasPos {
+		return nil
+	}
+
+	r := 0.1
+	for i := 0; i < 100; i++ {
+		f := xirrNPV(cfs, r)
+		if math.Abs(f) < 1e-6 {
+			return &r
+		}
+		d := xirrDeriv(cfs, r)
+		if d == 0 || math.IsNaN(d) || math.IsInf(d, 0) {
+			break
+		}
+		next := r - f/d
+		if next <= -0.999999 {
+			next = (-0.999999 + r) / 2
+		}
+		if math.IsNaN(next) || math.IsInf(next, 0) {
+			break
+		}
+		r = next
+	}
+
+	// 이분법 폴백
+	lo, hi := -0.99, 10.0
+	flo := xirrNPV(cfs, lo)
+	fhi := xirrNPV(cfs, hi)
+	if flo == 0 {
+		return &lo
+	}
+	if fhi == 0 {
+		return &hi
+	}
+	if (flo < 0) == (fhi < 0) {
+		return nil
+	}
+	for i := 0; i < 200; i++ {
+		mid := (lo + hi) / 2
+		fmid := xirrNPV(cfs, mid)
+		if math.Abs(fmid) < 1e-6 {
+			return &mid
+		}
+		if (fmid < 0) == (flo < 0) {
+			lo, flo = mid, fmid
+		} else {
+			hi, fhi = mid, fmid
+		}
+	}
+	mid := (lo + hi) / 2
+	return &mid
 }
