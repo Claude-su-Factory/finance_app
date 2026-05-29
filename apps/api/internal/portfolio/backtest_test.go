@@ -529,6 +529,36 @@ func TestRun_BenchmarkClamp_EmitsWarning(t *testing.T) {
 	}
 }
 
+func TestRun_UsdFxClamp_EmitsWarning(t *testing.T) {
+	days := genDays(t, "2024-01-01", 50)
+	deps := krStockDeps(days, []string{"id1"})
+	// id1을 USD 종목으로 전환.
+	deps.metas["id1"] = InstrumentMeta{Symbol: "00A", Name: "종목A", Currency: "USD", AssetClass: "US_STOCK"}
+	// USD 환율이 2024-01-16(days[15])부터만 존재 → fx firstAvailable이 클램프 지배 + 경고 기대.
+	usdFx := map[string]float64{}
+	for _, d := range days[15:] {
+		usdFx[d] = 1300
+	}
+	deps.fx["USD"] = usdFx
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-03-01"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 100}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	found := false
+	for _, w := range res.CoverageWarnings {
+		if w.Symbol == "USD/KRW" && w.FirstAvailable == "2024-01-16" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("USD/KRW 커버리지 경고 누락: %+v", res.CoverageWarnings)
+	}
+}
+
 func TestRestrictForwardFilled_SeedsFromBeforeSentinel(t *testing.T) {
 	// "__before"(윈도우 직전 폴백)만 있고 clampStart 당일 실데이터가 없을 때,
 	// densify 결과가 폴백값으로 시드되어야 한다(엔진 lookupFxForward 계약과 일치 → 1.0 오평가 방지).

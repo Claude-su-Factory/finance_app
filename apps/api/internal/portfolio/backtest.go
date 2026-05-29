@@ -614,6 +614,7 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 		first  string
 	}
 	clampStart := reqStartStr // 문자열(YYYY-MM-DD) 사전순 비교 = 시간순 max
+	hasUSDLeg := false        // USD 환율 경고 게이트: 비KRW 레그가 있을 때만 fx가 클램프에 기여
 	rows := make([]legData, 0, len(req.Basket))
 	for _, b := range req.Basket {
 		m := metas[b.InstrumentID]
@@ -633,6 +634,7 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 			clampStart = first
 		}
 		if m.Currency != "KRW" {
+			hasUSDLeg = true
 			if ff := firstAvailable(fx); ff != "" && ff > clampStart {
 				clampStart = ff // USD leg fx firstAvailable도 포함 (§5-5)
 			}
@@ -707,6 +709,15 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 			FirstAvailable: sf,
 			Message:        "비교 지수(S&P 500) 데이터가 " + sf + "부터 존재해 시작일을 조정했습니다",
 		})
+	}
+	if hasUSDLeg {
+		if ff := firstAvailable(usdFx); ff != "" && ff > naturalStart {
+			warnings = append(warnings, CoverageWarning{
+				Symbol:         "USD/KRW",
+				FirstAvailable: ff,
+				Message:        "환율(USD/KRW) 데이터가 " + ff + "부터 존재해 시작일을 조정했습니다",
+			})
+		}
 	}
 
 	kospiCloses := restrictForwardFilled(benchCloseMap(kospiPts), allDays, clampedDays)
