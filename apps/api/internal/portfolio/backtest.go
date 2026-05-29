@@ -184,6 +184,8 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 
 	for idx, d := range tradingDays {
 		// 1) 적립 먼저 — 현재 NAV로 유닛 발행 → NAV 불변.
+		//    불변식: 축 = KOSPI∪SPX 거래일(pg_deps.TradingDays)이라 1개월 초과 공백이 없다
+		//    → 적립일당 정확히 1회 발행(커서를 1개월씩 전진). 이 의미를 단위 테스트가 박제.
 		if idx > 0 && nextContrib != "" && d >= nextContrib {
 			nav := portValue(legs, shares, tradingDays, idx) / fundUnits
 			if nav > 0 {
@@ -203,6 +205,7 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 		}
 
 		// 2) 리밸런싱 나중 — 적립 반영 후 V 재계산(캐시 금지). 목표 비중 복원, V·NAV 불변.
+		//    위와 동일 불변식(1개월 초과 공백 없음) → 리밸런싱일당 1회.
 		if idx > 0 && nextRebal != "" && d >= nextRebal {
 			v := portValue(legs, shares, tradingDays, idx)
 			for i, leg := range legs {

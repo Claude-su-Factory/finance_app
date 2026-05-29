@@ -71,7 +71,7 @@ export function BasketBuilder({
         </div>
       )}
       <div className="text-xs text-fg-muted mt-1 text-right tabular-nums">
-        합계 {sum}%
+        합계 {Math.round(sum * 100) / 100}%
       </div>
     </div>
   );
