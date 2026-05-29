@@ -97,6 +97,7 @@
 - ✅ W5-T7 포트폴리오 행 7일 스파크라인 (batch fetch) (`8c01b38`)
 - ✅ Paper Trading (라이브) — 가상 자금 매매 시뮬레이션. `/app/paper` 페이지, 매매·리셋 모달, 평가액 시계열 차트, 매매 일기 통합.
 - ✅ AI 채팅 교육자 역할 — 개념 질문(PER·분산투자 등)에 도구 없이 친절 설명. 데이터 footer는 시세·보유 데이터 사용 답변에만 부착(`usedAnyTool` 게이팅). 정체성 spec §3 교육자 역할.
+- ✅ Paper Trading 백테스트 (서브시스템 B) — 과거 시점 시뮬레이션. `/app/backtest`, 선언적 바스켓(최대 10·자동 정규화) + 2축 전략(일시불/월 적립 × 없음·분기·반기·연), NAV/유닛 적립중립 수익률, 단일 `simulate()`로 KOSPI·S&P·한미 60/40 동시 비교(초과수익 vs 60/40), XIRR·MDD·변동성, 5년 클램프 + 커버리지 경고. 무상태(신규 테이블 0). `internal/portfolio/backtest.go` + `POST /v1/backtest/run`.
 
 ## 알려진 결함 / 백로그
 
@@ -123,6 +124,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-29 백테스트(서브시스템 B) 출시 — `/app/backtest` 신규 탭(사이드바 History 아이콘). 선언적 바스켓(최대 10종목·실행 시 자동 정규화) + 2축 전략(투입: 일시불/월 적립 × 리밸런싱: 없음·분기·반기·연) 과거 시뮬레이션. NAV/유닛 펀드 회계로 적립 중립 수익률(TWR) + 단일 `simulate()`로 전략·KOSPI·S&P·한미 60/40 4종을 동일 캐시플로우·리밸런싱으로 실행 → 초과수익(vs 60/40). XIRR 머니가중 CAGR(Newton+이분법, 실패 시 null) + MDD + 변동성. 5년·종료일 오늘 클램프(레그별 최초 가용일 + USD 레그 fx 반영), <30일 INSUFFICIENT_DATA, 데이터 짧은 종목 커버리지 경고. 무상태(신규 테이블 0, 공개 가격·지수·환율만 슈퍼유저 풀 read — `db.AsUser`/RLS 불필요, 인증 게이트만). `internal/portfolio/backtest.go`(알파와 패키지 공존) + `POST /v1/backtest/run` + 5선 멀티라인 평가액 차트 + 비교표. 정체성 spec §1 3축의 '백테스트' 약속 완성. 라이브 Paper Trading과 별개 서브시스템.
 - 2026-05-29 AI 채팅 교육자 역할 추가 — 분석가 페르소나에 "학습 도우미" 결합. 개념 질문(PER·분산투자·ETF 등)은 도구 호출 없이 일반 지식으로 친절히 설명하고 데이터 footer를 생략. 핸들러의 footer 강제 부착을 `usedAnyTool` 게이팅으로 변경 — 시세·보유 데이터를 실제 사용한 답변에만 `(데이터 기준 …)` 부착. mock도 도구 결과 여부로 footer 분기. 신규 테스트 2(개념 무footer·데이터 footer) + SSE 토큰 재조립 헬퍼. 정체성 spec §3 교육자 역할 이행. 통합 테스트 자체 종목 시드로 백필 의존 제거(`seedTestInstrument`). CSV import 드롭(유지보수 비용 대비 가치 부족).
 - 2026-05-28 Paper Trading (라이브) 출시 — 사이드바 📈 신규 탭 + `/app/paper` 별도 페이지. 가상 자금(default ₩1,000만) + 즉시 시장가 체결 + 가중 평균 avg_cost + 매매 이유 → journal_entries auto entry 자동. 리셋 기능(holdings 삭제 + cash 초기화 + transactions active=false 보존). 신규 테이블 3 + RLS 10 정책 + 4 HTTP endpoint(/v1/paper/*) + 12 unit + 4 integration. 평가액 시계열은 transactions replay + 시점별 가격(알파 카드 패턴 재사용). 정체성 spec §1 3축 마지막 축 이행. 백테스트(서브시스템 B)는 별도.
 - 2026-05-28 AI 매매 일기 출시 — Holdings CRUD 통합(reason → auto entry) + `/app/journal` 별도 페이지(manual entry 자유 작성). 자동 월간 회고 cron(매월 1일 07:00 KST 사용자 hash 분단위 분산) + on-demand 분석 버튼(채팅 한도 차감) + 채팅 `analyze_journal` 도구. 신규 테이블 2(`journal_entries`·`analysis_runs`) + RLS 6 정책 + 6 HTTP endpoint(/v1/journal/*) + 7 unit + 2 integration. 사이드바 📓 아이콘 추가. 정체성 spec §3 최우선 차별화 카드 이행.

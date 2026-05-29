@@ -15,6 +15,12 @@
   - 운영: `flyctl ssh console -C "/app/backfill --market=INDICES --years=5"`
   - 1회 실행. ~5분 소요. 미실행 시 알파 카드는 "데이터 부족"으로 빈 상태.
 
+- [ ] **백테스트 대상 종목 가격 백필** — *백테스트 동작 전제 (spec §3-3)*
+  - KOSPI·KOSDAQ 전종목 + 지수는 W2b 백필 CLI로 적재됨. **NASDAQ은 시드 30종목만** 보유 → 그 외 미국 종목을 바스켓에 넣으면 클램프되거나 "데이터 부족"으로 거부될 수 있음.
+  - 미국 종목 백필: `cd apps/api && set -a; source .env; set +a; go run ./cmd/backfill --market=NASDAQ --years=5` (대상 확장은 백필 CLI의 NASDAQ 시드 목록 편집)
+  - 운영: `flyctl ssh console -C "/app/backfill --market=NASDAQ --years=5"`
+  - 지수 백필(위 항목)이 선행돼야 벤치마크 3종(KOSPI·S&P·60/40)이 그려진다.
+
 ---
 
 ## 🟡 운영 배포 시 — Phase 1 출시 전 마지막 단계
