@@ -671,7 +671,7 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 		return nil, &InsufficientDataError{Reason: "backtest_window_too_short", MinDays: minBacktestDays, CurrentDays: len(clampedDays)}
 	}
 
-	naturalStart := allDays[0] // 커버리지 경고 기준선 = 윈도우의 실제 첫 영업일(allDays는 line 605에서 비어있지 않음 보장)
+	naturalStart := allDays[0] // 경고 기준선: clampStart(러닝 max)가 아닌 윈도우 실제 첫 영업일 → 시작일을 단축시킨 모든 소스가 각자 경고를 낸다(최종 클램프 지배 소스만이 아니라)
 	stratLegs := make([]Leg, len(rows))
 	normalized := make([]NormalizedLeg, len(rows))
 	var warnings []CoverageWarning
