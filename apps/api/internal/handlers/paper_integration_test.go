@@ -46,6 +46,23 @@ func cleanupPaperUser(pool *pgxpool.Pool, uid string) {
 	_, _ = pool.Exec(context.Background(), `delete from auth.users where id = $1`, uid)
 }
 
+// seedTestInstrument는 FK 충족용 테스트 종목을 멱등 삽입한다. 백필 CLI 실행 여부와
+// 무관하게 통합 테스트가 동작하도록 — 실제 시세 데이터는 필요 없다(테스트가 가격을 직접 전달).
+func seedTestInstrument(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	var id string
+	err := pool.QueryRow(context.Background(), `
+		insert into public.instruments (symbol, exchange, name, asset_class, currency)
+		values ('TST', 'TEST', 'Paper Test Instrument', 'KR_STOCK', 'KRW')
+		on conflict (symbol, exchange) do update set name = excluded.name
+		returning id::text
+	`).Scan(&id)
+	if err != nil {
+		t.Fatalf("seed instrument: %v", err)
+	}
+	return id
+}
+
 func TestPaper_E2E_AccountAutoCreate(t *testing.T) {
 	pool := openPaperPool(t)
 	uid := uuid.NewString()
@@ -76,11 +93,7 @@ func TestPaper_E2E_BuyTransaction(t *testing.T) {
 	seedPaperUser(t, pool, uid)
 	defer cleanupPaperUser(pool, uid)
 
-	var instID string
-	if err := pool.QueryRow(context.Background(),
-		`select id::text from public.instruments where symbol = '005930' limit 1`).Scan(&instID); err != nil {
-		t.Skip("instrument 005930 not seeded")
-	}
+	instID := seedTestInstrument(t, pool)
 
 	repo := handlers.NewPgPaperRepo()
 	ctx := context.Background()
@@ -131,13 +144,12 @@ func TestPaper_RLS_Isolation(t *testing.T) {
 	defer cleanupPaperUser(pool, uA)
 	defer cleanupPaperUser(pool, uB)
 
+	instID := seedTestInstrument(t, pool)
 	repo := handlers.NewPgPaperRepo()
 	ctx := context.Background()
 
 	_ = db.AsUser(ctx, pool, uA, func(exec db.Executor) error {
 		_, _ = repo.GetOrCreateAccount(ctx, exec, uA)
-		var instID string
-		_ = exec.QueryRow(ctx, `select id::text from public.instruments limit 1`).Scan(&instID)
 		_ = repo.UpsertHolding(ctx, exec, uA, instID, 1, 100)
 		return nil
 	})
