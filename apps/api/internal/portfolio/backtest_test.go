@@ -488,6 +488,23 @@ func TestRun_ClampIncludesBenchmarkFirstAvailable(t *testing.T) {
 	}
 }
 
+func TestRun_FullCoverage_NoSpuriousWarning(t *testing.T) {
+	days := genDays(t, "2024-01-01", 40)
+	deps := krStockDeps(days, []string{"id1", "id2"})
+	// 모든 소스(레그·KOSPI·SPX)가 윈도우 전체를 커버 → 경고 0건이어야 한다.
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-02-15"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 50}, {"id2", 50}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	if len(res.CoverageWarnings) != 0 {
+		t.Errorf("full coverage인데 스푸리어스 경고 발생: %+v", res.CoverageWarnings)
+	}
+}
+
 func TestRestrictForwardFilled_SeedsFromBeforeSentinel(t *testing.T) {
 	// "__before"(윈도우 직전 폴백)만 있고 clampStart 당일 실데이터가 없을 때,
 	// densify 결과가 폴백값으로 시드되어야 한다(엔진 lookupFxForward 계약과 일치 → 1.0 오평가 방지).

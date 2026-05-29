@@ -669,6 +669,7 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 		return nil, &InsufficientDataError{Reason: "backtest_window_too_short", MinDays: minBacktestDays, CurrentDays: len(clampedDays)}
 	}
 
+	naturalStart := allDays[0] // 커버리지 경고 기준선 = 윈도우의 실제 첫 영업일(allDays는 line 605에서 비어있지 않음 보장)
 	stratLegs := make([]Leg, len(rows))
 	normalized := make([]NormalizedLeg, len(rows))
 	var warnings []CoverageWarning
@@ -684,7 +685,7 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 			FxToKRW: fxMap,
 		}
 		normalized[i] = NormalizedLeg{InstrumentID: ld.item.InstrumentID, Symbol: ld.meta.Symbol, Name: ld.meta.Name, Weight: w}
-		if ld.first > reqStartStr {
+		if ld.first > naturalStart {
 			warnings = append(warnings, CoverageWarning{
 				Symbol:         ld.meta.Symbol,
 				FirstAvailable: ld.first,
