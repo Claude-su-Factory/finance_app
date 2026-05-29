@@ -135,7 +135,10 @@ func TestBacktestHandler_AssetNotSupported(t *testing.T) {
 	}
 	var got map[string]any
 	_ = json.Unmarshal(w.Body.Bytes(), &got)
-	errBlock := got["error"].(map[string]any)
+	errBlock, ok := got["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing error block: %+v", got)
+	}
 	if errBlock["code"] != "ASSET_NOT_SUPPORTED" {
 		t.Errorf("code=%v", errBlock["code"])
 	}
@@ -151,7 +154,10 @@ func TestBacktestHandler_InsufficientData(t *testing.T) {
 	}
 	var got map[string]any
 	_ = json.Unmarshal(w.Body.Bytes(), &got)
-	errBlock := got["error"].(map[string]any)
+	errBlock, ok := got["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing error block: %+v", got)
+	}
 	if errBlock["code"] != "INSUFFICIENT_DATA" || errBlock["current_days"].(float64) != 12 {
 		t.Errorf("error=%+v", errBlock)
 	}
