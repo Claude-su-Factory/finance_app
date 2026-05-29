@@ -209,6 +209,82 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 	return out
 }
 
+// SeriesMetrics는 한 시계열(전략 또는 개별 벤치마크) 지표. excess는 Service.Run에서 별도 계산.
+type SeriesMetrics struct {
+	TotalReturnPct float64  `json:"total_return_pct"`
+	CAGRPct        *float64 `json:"cagr_pct"` // XIRR 실패 시 null
+	MDDPct         float64  `json:"mdd_pct"`
+	VolatilityPct  float64  `json:"volatility_pct"`
+	TWRPct         float64  `json:"twr_pct"`
+}
+
+// maxDrawdown — NAV 시계열 최대 고점-저점 낙폭 (음수 %).
+func maxDrawdown(nav []ValuePoint) float64 {
+	if len(nav) == 0 {
+		return 0
+	}
+	peak := nav[0].Value
+	maxDD := 0.0
+	for _, p := range nav {
+		if p.Value > peak {
+			peak = p.Value
+		}
+		if peak > 0 {
+			if dd := (p.Value - peak) / peak; dd < maxDD {
+				maxDD = dd
+			}
+		}
+	}
+	return maxDD * 100
+}
+
+// annualizedVol — NAV 일간 수익률 표본표준편차 × √252 (%).
+// nav<3이면 0 반환은 방어용일 뿐: 클램프 하한(minBacktestDays=30)이 실 실행 시 항상 ≥30 NAV 포인트를 보장 → 변동성은 항상 계산됨.
+func annualizedVol(nav []ValuePoint) float64 {
+	if len(nav) < 3 {
+		return 0
+	}
+	rets := make([]float64, 0, len(nav)-1)
+	for i := 1; i < len(nav); i++ {
+		if prev := nav[i-1].Value; prev > 0 {
+			rets = append(rets, (nav[i].Value-prev)/prev)
+		}
+	}
+	if len(rets) < 2 {
+		return 0
+	}
+	var mean float64
+	for _, r := range rets {
+		mean += r
+	}
+	mean /= float64(len(rets))
+	var ss float64
+	for _, r := range rets {
+		ss += (r - mean) * (r - mean)
+	}
+	variance := ss / float64(len(rets)-1)
+	return math.Sqrt(variance) * math.Sqrt(252) * 100
+}
+
+// metrics — 한 시계열의 {총수익률, CAGR(XIRR), MDD, 변동성, TWR}.
+func metrics(out SimOutput) SeriesMetrics {
+	m := SeriesMetrics{
+		MDDPct:        maxDrawdown(out.NAV),
+		VolatilityPct: annualizedVol(out.NAV),
+	}
+	if out.TotalContributed > 0 {
+		m.TotalReturnPct = (out.FinalEquity - out.TotalContributed) / out.TotalContributed * 100
+	}
+	if len(out.NAV) > 0 {
+		m.TWRPct = (out.NAV[len(out.NAV)-1].Value - 1.0) * 100
+	}
+	if r := xirr(out.Cashflows); r != nil {
+		pct := *r * 100
+		m.CAGRPct = &pct
+	}
+	return m
+}
+
 func yearFrac(d0, dk string) float64 {
 	a, _ := time.Parse("2006-01-02", d0)
 	b, _ := time.Parse("2006-01-02", dk)

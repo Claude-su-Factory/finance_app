@@ -180,3 +180,41 @@ func TestXIRR_NonConverging_ReturnsNull(t *testing.T) {
 		t.Errorf("expected nil, got %v", *r)
 	}
 }
+
+func TestMetrics_MDD_OnNAV_NotEquity(t *testing.T) {
+	// NAV는 1.0→0.8→1.1 (−20% 낙폭), Equity는 적립으로 단조 증가.
+	// MDD가 Equity 기준이면 0%(단조증가), NAV 기준이면 −20%.
+	out := SimOutput{
+		Equity: []ValuePoint{{"d0", 1_000_000}, {"d1", 1_500_000}, {"d2", 2_500_000}},
+		NAV:    []ValuePoint{{"d0", 1.0}, {"d1", 0.8}, {"d2", 1.1}},
+		Cashflows: []Cashflow{
+			{Amount: -1_000_000, Date: "2021-01-01"}, {Amount: -1_000_000, Date: "2021-06-01"},
+			{Amount: 2_500_000, Date: "2022-01-01"},
+		},
+		TotalContributed: 2_000_000, FinalEquity: 2_500_000,
+	}
+	m := metrics(out)
+	approx(t, m.MDDPct, -20, 1e-6, "MDD on NAV")
+}
+
+func TestMetrics_Volatility_Annualized(t *testing.T) {
+	// 일간 수익률 +10%, −10% → 표본표준편차 √0.02, 연환산 ×√252.
+	out := SimOutput{NAV: []ValuePoint{{"d0", 100}, {"d1", 110}, {"d2", 99}}}
+	m := metrics(out)
+	approx(t, m.VolatilityPct, 224.50, 0.1, "annualized vol")
+}
+
+func TestMetrics_LumpSum_TotalReturnAndCAGR(t *testing.T) {
+	out := SimOutput{
+		NAV:              []ValuePoint{{"d0", 1.0}, {"d1", 2.0}},
+		Cashflows:        []Cashflow{{Amount: -1_000_000, Date: "2021-01-01"}, {Amount: 2_000_000, Date: "2024-01-01"}},
+		TotalContributed: 1_000_000, FinalEquity: 2_000_000,
+	}
+	m := metrics(out)
+	approx(t, m.TotalReturnPct, 100, 1e-6, "total return")
+	approx(t, m.TWRPct, 100, 1e-6, "twr = (NAV_end-1)*100")
+	if m.CAGRPct == nil {
+		t.Fatalf("cagr nil")
+	}
+	approx(t, *m.CAGRPct, 25.9921, 1e-2, "cagr pct ~ 26")
+}
