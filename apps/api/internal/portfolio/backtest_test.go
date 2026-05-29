@@ -468,3 +468,22 @@ func mustParse(t *testing.T, s string) time.Time {
 	}
 	return tm
 }
+
+func TestRun_ClampIncludesBenchmarkFirstAvailable(t *testing.T) {
+	days := genDays(t, "2024-01-01", 50)
+	deps := krStockDeps(days, []string{"id1"})
+	// 전략 leg(id1)은 2024-01-01부터 존재하나, KOSPI 벤치마크는 2024-01-16부터만 존재
+	// → 벤치마크 firstAvailable이 클램프를 지배해야 한다(§5-5).
+	deps.bench["KOSPI"] = benchPts(days[15:], 2000)
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-03-01"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 100}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	if res.ClampedStart != "2024-01-16" {
+		t.Errorf("clampedStart=%s, want 2024-01-16 (KOSPI firstAvailable)", res.ClampedStart)
+	}
+}
