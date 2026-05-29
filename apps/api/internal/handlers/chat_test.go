@@ -120,6 +120,59 @@ func TestStreamChat_TextOnly(t *testing.T) {
 	}
 }
 
+// collectTokenText는 SSE token 이벤트의 text를 이어 붙인다 — 프런트가 받는 최종 문자열.
+// (개별 token은 공백 단위로 쪼개지므로 raw body 부분문자열 검사로는 footer를 못 잡는다.)
+func collectTokenText(t *testing.T, body string) string {
+	t.Helper()
+	var sb strings.Builder
+	for line := range strings.SplitSeq(body, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var ev struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &ev); err != nil {
+			continue
+		}
+		sb.WriteString(ev.Text)
+	}
+	return sb.String()
+}
+
+// 개념 질문(도구 미사용)에는 데이터 footer를 붙이지 않는다 — 교육자 역할.
+func TestStreamChat_ConceptNoFooter(t *testing.T) {
+	repo := &fakeChatRepo{}
+	h := NewChatHandler(repo, nil, &ai.MockClient{}, tools.NewRegistry())
+
+	w := httptest.NewRecorder()
+	h.StreamChat(w, chatReq(t, `{"message":"PER이 뭐야?"}`, "user-1"))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d, body=%s", w.Code, w.Body.String())
+	}
+	if text := collectTokenText(t, w.Body.String()); strings.Contains(text, "데이터 기준") {
+		t.Errorf("개념 질문에 데이터 footer가 붙음: %s", text)
+	}
+}
+
+// 시세·보유 데이터를 쓴 답변에는 footer를 부착한다 (spec §5).
+func TestStreamChat_DataAnswerHasFooter(t *testing.T) {
+	repo := &fakeChatRepo{}
+	h := NewChatHandler(repo, nil, &ai.MockClient{}, tools.NewRegistry())
+
+	w := httptest.NewRecorder()
+	h.StreamChat(w, chatReq(t, `{"message":"내 포트폴리오 분석해줘"}`, "user-1"))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d, body=%s", w.Code, w.Body.String())
+	}
+	if text := collectTokenText(t, w.Body.String()); !strings.Contains(text, "데이터 기준") {
+		t.Errorf("데이터 답변에 footer가 없음: %s", text)
+	}
+}
+
 func TestStreamChat_LimitExceeded(t *testing.T) {
 	repo := &fakeChatRepo{limitErr: ErrUsageExceeded}
 	h := NewChatHandler(repo, nil, &ai.MockClient{}, tools.NewRegistry())

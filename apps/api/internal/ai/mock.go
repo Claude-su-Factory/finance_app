@@ -107,15 +107,28 @@ func (m *MockClient) streamText(ctx context.Context, ch chan<- Event, text strin
 	}
 }
 
-func (m *MockClient) composeReply(userMsg string, _ []Message) string {
-	stamp := time.Now().Format("2006-01-02 15:04")
-	return fmt.Sprintf(
+func (m *MockClient) composeReply(userMsg string, msgs []Message) string {
+	// 직전 turn이 도구 결과였는지 — 그 경우에만 데이터 footer 부착.
+	// (텍스트 turn도 ToolCalls가 채워지므로 전체 스캔 대신 마지막 메시지만 본다.)
+	usedTool := false
+	if n := len(msgs); n > 0 {
+		last := msgs[n-1]
+		if last.Role == RoleUser && len(last.ToolCalls) > 0 {
+			usedTool = true
+		}
+	}
+	base := fmt.Sprintf(
 		"질문 \"%s\"에 대한 분석입니다.\n\n"+
 			"보유 자산과 최근 시세를 기준으로 보면, 변동성이 큰 종목과 안정적 종목의 비중을 점검할 시점입니다. "+
-			"분산 효과를 위해 자산군별 비중을 재확인해보실 수 있습니다.\n\n"+
-			"(데이터 기준: %s KST, 시세 지연 15분)",
-		truncate(userMsg, 60), stamp,
+			"분산 효과를 위해 자산군별 비중을 재확인해보실 수 있습니다.",
+		truncate(userMsg, 60),
 	)
+	if !usedTool {
+		return base
+	}
+	loc, _ := time.LoadLocation("Asia/Seoul")
+	stamp := time.Now().In(loc).Format("2006-01-02 15:04")
+	return base + fmt.Sprintf("\n\n(데이터 기준: %s KST, 시세 지연 15분)", stamp)
 }
 
 func tokenize(s string) []string {

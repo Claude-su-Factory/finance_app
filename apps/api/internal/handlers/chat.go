@@ -21,12 +21,13 @@ import (
 
 const MaxToolDepth = 8 // spec §10-10
 
-const systemPrompt = `당신은 Quotient의 분석가입니다. 사용자의 보유 자산·관심 종목·시장 데이터를 도구로 조회하여 분석 관점을 제공합니다.
+const systemPrompt = `당신은 Quotient의 분석가이자 학습 도우미입니다. 사용자의 보유 자산·관심 종목·시장 데이터를 도구로 조회하여 분석 관점을 제공하고, 투자 개념 질문에는 친절히 설명합니다.
 
 규칙:
 - 직접 매수/매도 권유 금지. "분석 관점에서 ~를 살펴볼 수 있습니다" 형태로 표현.
-- 모든 수치는 도구 호출 결과를 근거로. 추측 금지.
-- 응답 끝에 "(데이터 기준: YYYY-MM-DD HH:MM KST, 시세 지연 15분)" 자동 부착.
+- 시장·자산 수치는 도구 호출 결과를 근거로. 추측 금지.
+- 개념 질문(예: PER·분산투자·ETF가 무엇인지)에는 도구 없이 일반 지식으로 쉽고 친절하게 설명한다. 특정 종목 매수/매도 권유로 이어가지 않는다.
+- 시세·보유 데이터를 사용한 답변 끝에만 "(데이터 기준: YYYY-MM-DD HH:MM KST, 시세 지연 15분)"를 부착한다. 데이터를 쓰지 않은 개념 설명에는 부착하지 않는다.
 - 세금·법무 자문 요청 → "전문가에게 문의하세요" 안내.`
 
 type ChatHandler struct {
@@ -160,6 +161,7 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 
 	totalInput, totalOutput := 0, 0
 	var lastSavedID string
+	usedAnyTool := false // 시세·보유 데이터 사용 여부 — footer 부착 조건
 
 	// Tool routing loop
 	for depth := range MaxToolDepth {
@@ -222,11 +224,18 @@ func (h *ChatHandler) StreamChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if len(turnToolUses) > 0 {
+			usedAnyTool = true
+		}
+
 		// 마지막 turn(도구 호출 없음)이고 텍스트 응답이 있으면 disclaimer 강제 부착 (spec §5).
 		// systemPrompt 의존만으로는 모델이 누락할 수 있어 핸들러 단에서 보장.
+		// 단, 시세·보유 데이터를 한 번도 안 쓴 답변(개념 설명·인사 등)에는 부착하지 않는다.
+		// 핸들러는 footer를 추가만 하고 제거하지 않는다 — 개념 답변에 모델이 스스로 footer를
+		// 붙이는 경우는 프롬프트로만 억제한다.
 		// SSE token으로도 emit해 사용자 화면에 반영.
 		isFinalTurn := len(turnToolUses) == 0
-		if isFinalTurn && turnText != "" && !strings.Contains(turnText, "데이터 기준") {
+		if isFinalTurn && turnText != "" && usedAnyTool && !strings.Contains(turnText, "데이터 기준") {
 			loc, _ := time.LoadLocation("Asia/Seoul")
 			stamp := time.Now().In(loc).Format("2006-01-02 15:04")
 			disclaimer := fmt.Sprintf("\n\n(데이터 기준: %s KST, 시세 지연 15분)", stamp)
