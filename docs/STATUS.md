@@ -1,6 +1,6 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-28
+마지막 업데이트: 2026-05-29
 
 ## 현재 Phase
 
@@ -96,6 +96,7 @@
 - ✅ W5-T6 watchlist editor + backend asset_class 가드 (`19eea04`)
 - ✅ W5-T7 포트폴리오 행 7일 스파크라인 (batch fetch) (`8c01b38`)
 - ✅ Paper Trading (라이브) — 가상 자금 매매 시뮬레이션. `/app/paper` 페이지, 매매·리셋 모달, 평가액 시계열 차트, 매매 일기 통합.
+- ✅ AI 채팅 교육자 역할 — 개념 질문(PER·분산투자 등)에 도구 없이 친절 설명. 데이터 footer는 시세·보유 데이터 사용 답변에만 부착(`usedAnyTool` 게이팅). 정체성 spec §3 교육자 역할.
 
 ## 알려진 결함 / 백로그
 
@@ -118,10 +119,11 @@
 - ~~**AI 컨텍스트 요약 미구현**~~ — **2026-05-27 해결**: `BuildMessages(ctx, all, summarizer)`로 시그니처 확장. summarizer 주입 시 Haiku로 dropped 메시지 1턴 요약, nil이면 기존 placeholder fallback. chat handler가 `h.client` 그대로 주입 (Mock/Real 무관).
 - ~~**일일 브리핑 도구 호출 없음**~~ — **2026-05-27 해결**: `briefing_worker`가 brief 작성 전 `get_portfolio` + `get_market_overview` + `get_watchlist` 도구를 직접 실행하여 결과 JSON을 system prompt에 주입. spec §10-8 충족. registry nil이면 fallback (데이터 없이 일반 안내).
 - **사용량 토큰 turn-by-turn 누적 단순화**: 마지막 turn row에 누적 합계를 저장. turn별 분리 metrics는 v2
-- ~~**disclaimer 강제 부착 system prompt 의존**~~ — **2026-05-27 해결**: chat handler가 마지막 turn(도구 호출 없음) 영속화 직전에 turnText 끝에 `(데이터 기준: ... KST, 시세 지연 15분)` 강제 부착 + SSE token으로 emit. 이미 포함 시 중복 방지.
+- ~~**disclaimer 강제 부착 system prompt 의존**~~ — **2026-05-27 해결**: chat handler가 마지막 turn(도구 호출 없음) 영속화 직전에 turnText 끝에 `(데이터 기준: ... KST, 시세 지연 15분)` 강제 부착 + SSE token으로 emit. 이미 포함 시 중복 방지. **2026-05-29 보강**: 교육자 역할 도입으로 footer 강제 부착을 `usedAnyTool`로 게이팅 — 시세·보유 데이터를 한 번도 안 쓴 개념 답변에는 부착 안 함(붙일 데이터가 없으므로).
 
 ## 최근 변경 이력
 
+- 2026-05-29 AI 채팅 교육자 역할 추가 — 분석가 페르소나에 "학습 도우미" 결합. 개념 질문(PER·분산투자·ETF 등)은 도구 호출 없이 일반 지식으로 친절히 설명하고 데이터 footer를 생략. 핸들러의 footer 강제 부착을 `usedAnyTool` 게이팅으로 변경 — 시세·보유 데이터를 실제 사용한 답변에만 `(데이터 기준 …)` 부착. mock도 도구 결과 여부로 footer 분기. 신규 테스트 2(개념 무footer·데이터 footer) + SSE 토큰 재조립 헬퍼. 정체성 spec §3 교육자 역할 이행. 통합 테스트 자체 종목 시드로 백필 의존 제거(`seedTestInstrument`). CSV import 드롭(유지보수 비용 대비 가치 부족).
 - 2026-05-28 Paper Trading (라이브) 출시 — 사이드바 📈 신규 탭 + `/app/paper` 별도 페이지. 가상 자금(default ₩1,000만) + 즉시 시장가 체결 + 가중 평균 avg_cost + 매매 이유 → journal_entries auto entry 자동. 리셋 기능(holdings 삭제 + cash 초기화 + transactions active=false 보존). 신규 테이블 3 + RLS 10 정책 + 4 HTTP endpoint(/v1/paper/*) + 12 unit + 4 integration. 평가액 시계열은 transactions replay + 시점별 가격(알파 카드 패턴 재사용). 정체성 spec §1 3축 마지막 축 이행. 백테스트(서브시스템 B)는 별도.
 - 2026-05-28 AI 매매 일기 출시 — Holdings CRUD 통합(reason → auto entry) + `/app/journal` 별도 페이지(manual entry 자유 작성). 자동 월간 회고 cron(매월 1일 07:00 KST 사용자 hash 분단위 분산) + on-demand 분석 버튼(채팅 한도 차감) + 채팅 `analyze_journal` 도구. 신규 테이블 2(`journal_entries`·`analysis_runs`) + RLS 6 정책 + 6 HTTP endpoint(/v1/journal/*) + 7 unit + 2 integration. 사이드바 📓 아이콘 추가. 정체성 spec §3 최우선 차별화 카드 이행.
 - 2026-05-28 알파 카드 출시 — 홈 1행 3번째에 "포트폴리오 vs KOSPI · S&P 500 · 한미 60/40" 비교. 기간 토글 1M/90D/1Y/All, 시점별 환율, backward simulation. 빈 상태(가입 < 7일 + 보유 자산 0) 처리. `internal/portfolio/` 신규 패키지 + `GET /v1/portfolio/alpha` 핸들러 + 9 unit + 1 integration test. 지수 백필 CLI 확장(Task 0). 정체성 spec §2 약속 이행.
