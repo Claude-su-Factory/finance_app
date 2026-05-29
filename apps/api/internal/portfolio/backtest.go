@@ -527,6 +527,13 @@ func restrictForwardFilled(sparse map[string]float64, allDays, clampedDays []str
 	out := make(map[string]float64, len(clampedDays))
 	last := 0.0
 	have := false
+	// 윈도우 시작 직전 폴백("__before") 시드 — 엔진 lookupFxForward/closeAt와 동일 계약.
+	// 전략 leg fx는 클램프가 firstAvailable을 포함해 항상 커버되나, 벤치마크 usdFx는 클램프 비참여
+	// → 시작일 fx 누락 시 densify 결과 누락 → legFx 1.0 폴백으로 벤치마크 오평가. 이를 방지.
+	if v, ok := sparse["__before"]; ok && v > 0 {
+		last = v
+		have = true
+	}
 	for _, d := range allDays {
 		if v, ok := sparse[d]; ok && v > 0 {
 			last = v

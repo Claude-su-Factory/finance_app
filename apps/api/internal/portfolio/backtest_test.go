@@ -487,3 +487,15 @@ func TestRun_ClampIncludesBenchmarkFirstAvailable(t *testing.T) {
 		t.Errorf("clampedStart=%s, want 2024-01-16 (KOSPI firstAvailable)", res.ClampedStart)
 	}
 }
+
+func TestRestrictForwardFilled_SeedsFromBeforeSentinel(t *testing.T) {
+	// "__before"(윈도우 직전 폴백)만 있고 clampStart 당일 실데이터가 없을 때,
+	// densify 결과가 폴백값으로 시드되어야 한다(엔진 lookupFxForward 계약과 일치 → 1.0 오평가 방지).
+	allDays := []string{"2024-01-01", "2024-01-02", "2024-01-03"}
+	clamped := []string{"2024-01-01", "2024-01-02", "2024-01-03"}
+	sparse := map[string]float64{"__before": 1300, "2024-01-03": 1430}
+	out := restrictForwardFilled(sparse, allDays, clamped)
+	approx(t, out["2024-01-01"], 1300, 1e-9, "t0 seeded from __before")
+	approx(t, out["2024-01-02"], 1300, 1e-9, "carry forward __before")
+	approx(t, out["2024-01-03"], 1430, 1e-9, "real value overrides __before")
+}
