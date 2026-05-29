@@ -26,7 +26,7 @@ export function CompareTable({ result }: { result: BacktestResult }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.label} className={`border-b border-line/40 last:border-b-0 ${r.bold ? "text-bb-accent" : ""}`}>
+            <tr key={r.label} className={`border-b border-line/40 last:border-b-0 ${r.bold ? "text-bb-info" : ""}`}>
               <td className="text-left px-3 py-2">{r.label}</td>
               <td className="text-right px-3 py-2 tabular-nums">{pct(r.tr)}</td>
               <td className="text-right px-3 py-2 tabular-nums">{pct(r.cagr)}</td>
