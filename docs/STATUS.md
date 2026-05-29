@@ -1,6 +1,6 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-29
+마지막 업데이트: 2026-05-30
 
 ## 현재 Phase
 
@@ -122,10 +122,11 @@
 - **사용량 토큰 turn-by-turn 누적 단순화**: 마지막 turn row에 누적 합계를 저장. turn별 분리 metrics는 v2
 - ~~**disclaimer 강제 부착 system prompt 의존**~~ — **2026-05-27 해결**: chat handler가 마지막 turn(도구 호출 없음) 영속화 직전에 turnText 끝에 `(데이터 기준: ... KST, 시세 지연 15분)` 강제 부착 + SSE token으로 emit. 이미 포함 시 중복 방지. **2026-05-29 보강**: 교육자 역할 도입으로 footer 강제 부착을 `usedAnyTool`로 게이팅 — 시세·보유 데이터를 한 번도 안 쓴 개념 답변에는 부착 안 함(붙일 데이터가 없으므로).
 
-- **백테스트 커버리지 경고 — 벤치마크 클램프 미표기**: 시작일 클램프가 사용자 레그가 아닌 벤치마크(KOSPI·SPX) 최초 가용일에 좌우되면 `coverage_warnings`가 비어 `CoverageNotice`가 렌더되지 않음 → 조정된 시작일에 대한 설명 부재. 벤치마크 5년 백필 경계의 edge case(평상시 미발생). v2에서 벤치마크 사유 행 추가 검토. (2026-05-29 코드 리뷰 발견)
+- ~~**백테스트 커버리지 경고 — 벤치마크 클램프 미표기**: 시작일 클램프가 사용자 레그가 아닌 벤치마크(KOSPI·SPX) 최초 가용일에 좌우되면 `coverage_warnings`가 비어 `CoverageNotice`가 렌더되지 않음~~ — **2026-05-30 해결**: 경고 기준선을 `reqStartStr`(today−5Y, 거의 항상 과거)에서 `naturalStart := allDays[0]`(윈도우 실제 첫 영업일)으로 교정. 동시에 발견된 잠재 버그(모든 레그가 `> reqStartStr`로 매 백테스트마다 스푸리어스 경고)도 함께 해소. 레그 외 KOSPI·S&P 500·USD/KRW(USD 레그 한정) 클램프 사유 경고를 추가 방출 → `CoverageNotice` 정상 렌더. 회귀 가드 3종(`TestRun_FullCoverage_NoSpuriousWarning`·`TestRun_BenchmarkClamp_EmitsWarning`·`TestRun_UsdFxClamp_EmitsWarning`). 프론트 변경 0(심볼 키 충돌 없음). (`9c894d1`·`20f3a6b`·`952d866`)
 
 ## 최근 변경 이력
 
+- 2026-05-30 백테스트 커버리지 경고 결함 fix — 시작일이 벤치마크(KOSPI·S&P 500) 또는 USD/KRW 환율 데이터 부족으로 조정될 때 `coverage_warnings`가 비어 `CoverageNotice`가 안 뜨던 결함 해소. 근본 원인은 경고 기준선이 `reqStartStr`(today−5Y)였던 것 → `naturalStart := allDays[0]`(윈도우 실제 첫 영업일)로 교정. 이 한 변경이 (a) 모든 레그가 매 백테스트마다 경고를 띄우던 스푸리어스 버그와 (b) 벤치/fx 클램프 시 경고 누락을 동시 해결. 레그 루프 뒤 KOSPI·S&P 500·USD/KRW(USD 레그 게이트) 경고 블록 추가. 클램프 계산 로직은 무변경(이미 정상). 3 TDD 커밋 + 회귀 테스트 3 + 코드 리뷰 APPROVED. 프론트 변경 0. `internal/portfolio/backtest.go`.
 - 2026-05-29 백테스트(서브시스템 B) 출시 — `/app/backtest` 신규 탭(사이드바 History 아이콘). 선언적 바스켓(최대 10종목·실행 시 자동 정규화) + 2축 전략(투입: 일시불/월 적립 × 리밸런싱: 없음·분기·반기·연) 과거 시뮬레이션. NAV/유닛 펀드 회계로 적립 중립 수익률(TWR) + 단일 `simulate()`로 전략·KOSPI·S&P·한미 60/40 4종을 동일 캐시플로우·리밸런싱으로 실행 → 초과수익(vs 60/40). XIRR 머니가중 CAGR(Newton+이분법, 실패 시 null) + MDD + 변동성. 5년·종료일 오늘 클램프(레그별 최초 가용일 + USD 레그 fx 반영), <30일 INSUFFICIENT_DATA, 데이터 짧은 종목 커버리지 경고. 무상태(신규 테이블 0, 공개 가격·지수·환율만 슈퍼유저 풀 read — `db.AsUser`/RLS 불필요, 인증 게이트만). `internal/portfolio/backtest.go`(알파와 패키지 공존) + `POST /v1/backtest/run` + 5선 멀티라인 평가액 차트 + 비교표. 정체성 spec §1 3축의 '백테스트' 약속 완성. 라이브 Paper Trading과 별개 서브시스템.
 - 2026-05-29 AI 채팅 교육자 역할 추가 — 분석가 페르소나에 "학습 도우미" 결합. 개념 질문(PER·분산투자·ETF 등)은 도구 호출 없이 일반 지식으로 친절히 설명하고 데이터 footer를 생략. 핸들러의 footer 강제 부착을 `usedAnyTool` 게이팅으로 변경 — 시세·보유 데이터를 실제 사용한 답변에만 `(데이터 기준 …)` 부착. mock도 도구 결과 여부로 footer 분기. 신규 테스트 2(개념 무footer·데이터 footer) + SSE 토큰 재조립 헬퍼. 정체성 spec §3 교육자 역할 이행. 통합 테스트 자체 종목 시드로 백필 의존 제거(`seedTestInstrument`). CSV import 드롭(유지보수 비용 대비 가치 부족).
 - 2026-05-28 Paper Trading (라이브) 출시 — 사이드바 📈 신규 탭 + `/app/paper` 별도 페이지. 가상 자금(default ₩1,000만) + 즉시 시장가 체결 + 가중 평균 avg_cost + 매매 이유 → journal_entries auto entry 자동. 리셋 기능(holdings 삭제 + cash 초기화 + transactions active=false 보존). 신규 테이블 3 + RLS 10 정책 + 4 HTTP endpoint(/v1/paper/*) + 12 unit + 4 integration. 평가액 시계열은 transactions replay + 시점별 가격(알파 카드 패턴 재사용). 정체성 spec §1 3축 마지막 축 이행. 백테스트(서브시스템 B)는 별도.
