@@ -1,5 +1,7 @@
 package portfolio
 
+import "time"
+
 // Rebalance는 리밸런싱 주기 (없음·분기·반기·연).
 type Rebalance int
 
@@ -77,7 +79,33 @@ func portValue(legs []Leg, shares []float64, dates []string, idx int) float64 {
 	return v
 }
 
-// simulate — 순수 NAV/유닛 펀드 회계 시뮬 (DB 무관). T1: 일시불만. 적립·리밸런싱은 T2·T3.
+func lastDayOfMonth(y int, m time.Month) int {
+	return time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
+// addMonthsClamped — t0(YYYY-MM-DD) + k개월. 월말 오버플로(1/31+1mo=3/3) 방지: 일자를 대상 월 말일로 클램프.
+// 누적 커서 대신 t0에서 매번 새로 계산 → 드리프트 없음.
+func addMonthsClamped(t0 string, k int) string {
+	t, err := time.Parse("2006-01-02", t0)
+	if err != nil {
+		return t0
+	}
+	total := int(t.Month()) - 1 + k
+	y := t.Year() + total/12
+	mi := total % 12
+	if mi < 0 {
+		mi += 12
+		y--
+	}
+	m := time.Month(mi + 1)
+	day := t.Day()
+	if last := lastDayOfMonth(y, m); day > last {
+		day = last
+	}
+	return time.Date(y, m, day, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+}
+
+// simulate — 순수 NAV/유닛 펀드 회계 시뮬 (DB 무관). T1: 일시불. T2: DCA 적립. 리밸런싱은 T3.
 func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutput {
 	n := len(tradingDays)
 	out := SimOutput{
@@ -91,7 +119,6 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 	shares := make([]float64, len(legs))
 	t0 := tradingDays[0]
 
-	// t0 초기 매수 — 각 leg에 Initial*weight 배분
 	for i, leg := range legs {
 		alloc := plan.Initial * leg.Weight
 		px := closeAt(leg.Closes, tradingDays, 0)
@@ -100,11 +127,39 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 			shares[i] = alloc / (px * fx)
 		}
 	}
-	fundUnits := plan.Initial   // NAV(t0) = V/units = 1.0
+	fundUnits := plan.Initial
 	totalContributed := plan.Initial
 	cashflows := []Cashflow{{Amount: -plan.Initial, Date: t0}}
 
+	// 적립 커서 — t0 당일은 적립 없음, 첫 적립은 t0+1개월(또는 직후 첫 영업일).
+	contribCount := 0
+	nextContrib := ""
+	if plan.Monthly > 0 {
+		contribCount = 1
+		nextContrib = addMonthsClamped(t0, 1)
+	}
+
 	for idx, d := range tradingDays {
+		// 적립: 현재 NAV로 유닛 발행 → NAV 불변. 발생일 1회만(단일 advance).
+		// 전제: tradingDays는 일 단위 공통 축이므로 연속 영업일이 여러 앵커를 건너뛰지 않음(다월 공백 없음).
+		if idx > 0 && nextContrib != "" && d >= nextContrib {
+			nav := portValue(legs, shares, tradingDays, idx) / fundUnits
+			if nav > 0 {
+				fundUnits += plan.Monthly / nav
+			}
+			for i, leg := range legs {
+				px := closeAt(leg.Closes, tradingDays, idx)
+				fx := legFx(leg, tradingDays, idx)
+				if px > 0 && fx > 0 {
+					shares[i] += (plan.Monthly * leg.Weight) / (px * fx)
+				}
+			}
+			totalContributed += plan.Monthly
+			cashflows = append(cashflows, Cashflow{Amount: -plan.Monthly, Date: d})
+			contribCount++
+			nextContrib = addMonthsClamped(t0, contribCount)
+		}
+
 		v := portValue(legs, shares, tradingDays, idx)
 		nav := v / fundUnits
 		out.Equity = append(out.Equity, ValuePoint{Date: d, Value: v})

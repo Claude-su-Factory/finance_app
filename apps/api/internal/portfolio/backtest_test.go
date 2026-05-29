@@ -3,6 +3,7 @@ package portfolio
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func approx(t *testing.T, got, want, eps float64, msg string) {
@@ -61,4 +62,55 @@ func TestSimulate_TwoLegFx_USDLegConvertedKRW(t *testing.T) {
 	// 가격·환율 불변 → 평가액 불변
 	approx(t, out.Equity[0].Value, 1_000_000, 1e-6, "equity[0] two-leg")
 	approx(t, out.Equity[1].Value, 1_000_000, 1e-6, "equity[1] two-leg")
+}
+
+// monthlyAnchors — start 기준 0..months 개월 앵커 날짜 (day≤28이면 오버플로 없음 → addMonthsClamped와 동일).
+func monthlyAnchors(t *testing.T, start string, months int) []string {
+	t.Helper()
+	base, err := time.Parse("2006-01-02", start)
+	if err != nil {
+		t.Fatalf("bad start: %v", err)
+	}
+	out := make([]string, 0, months+1)
+	for k := 0; k <= months; k++ {
+		out = append(out, base.AddDate(0, k, 0).Format("2006-01-02"))
+	}
+	return out
+}
+
+func TestSimulate_DCA_ContributionsMintUnits_NAVUnchanged(t *testing.T) {
+	days := monthlyAnchors(t, "2021-01-15", 12) // 13일, 매월 앵커
+	closes := map[string]float64{}
+	for _, d := range days {
+		closes[d] = 100 // 가격 불변
+	}
+	legs := []Leg{{Weight: 1.0, Closes: closes}}
+	out := simulate(days, legs, Plan{Initial: 1_000_000, Monthly: 500_000}, RebalanceNone)
+
+	// 가격 불변 → 적립으로 유닛만 늘고 NAV는 항상 1.0 (적립일 점프 없음)
+	for i, p := range out.NAV {
+		approx(t, p.Value, 1.0, 1e-9, "nav["+days[i]+"]")
+	}
+}
+
+func TestSimulate_DCA_ContributionCount(t *testing.T) {
+	days := monthlyAnchors(t, "2021-01-15", 36) // 37일 = t0 + 36 앵커
+	closes := map[string]float64{}
+	for _, d := range days {
+		closes[d] = 100
+	}
+	legs := []Leg{{Weight: 1.0, Closes: closes}}
+	out := simulate(days, legs, Plan{Initial: 1_000_000, Monthly: 500_000}, RebalanceNone)
+
+	// 첫 적립 t0+1개월(t0 당일 없음) → 정확히 36회
+	approx(t, out.TotalContributed, 1_000_000+36*500_000, 1e-6, "totalContributed")
+	neg := 0
+	for _, cf := range out.Cashflows {
+		if cf.Amount < 0 {
+			neg++
+		}
+	}
+	if neg != 37 { // 초기 1 + 적립 36
+		t.Errorf("negative cashflows=%d, want 37", neg)
+	}
 }
