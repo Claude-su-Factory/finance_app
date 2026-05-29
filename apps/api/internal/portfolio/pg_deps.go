@@ -166,3 +166,28 @@ func (PgDeps) BenchmarkSeries(ctx context.Context, pool db.Executor, symbol stri
 	}
 	return out, rows.Err()
 }
+
+// InstrumentsMeta — 바스켓 종목 메타(symbol·name·currency·asset_class) 일괄 조회.
+func (PgDeps) InstrumentsMeta(ctx context.Context, pool db.Executor, ids []string) (map[string]InstrumentMeta, error) {
+	if len(ids) == 0 {
+		return map[string]InstrumentMeta{}, nil
+	}
+	rows, err := pool.Query(ctx, `
+		select id::text, symbol, name, currency, asset_class
+		from public.instruments where id = any($1::uuid[])
+	`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]InstrumentMeta{}
+	for rows.Next() {
+		var id string
+		var m InstrumentMeta
+		if err := rows.Scan(&id, &m.Symbol, &m.Name, &m.Currency, &m.AssetClass); err != nil {
+			return nil, err
+		}
+		out[id] = m
+	}
+	return out, rows.Err()
+}

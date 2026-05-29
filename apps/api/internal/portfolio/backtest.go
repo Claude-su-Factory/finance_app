@@ -1,8 +1,11 @@
 package portfolio
 
 import (
+	"context"
 	"math"
 	"time"
+
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 // Rebalance는 리밸런싱 주기 (없음·분기·반기·연).
@@ -48,6 +51,24 @@ type SimOutput struct {
 	TotalContributed float64
 	FinalEquity      float64
 	Cashflows        []Cashflow
+}
+
+// BacktestDeps는 백테스트가 쓰는 데이터 접근만 노출하는 분리 인터페이스.
+// 알파의 공유 Deps를 확장하지 않는다(EquityDeps 선례). PgDeps가 이를 만족.
+type BacktestDeps interface {
+	TradingDays(ctx context.Context, pool db.Executor, since, until time.Time) ([]string, error)
+	InstrumentClosesOnDates(ctx context.Context, pool db.Executor, instrumentID string, dates []string) (map[string]float64, error)
+	FxRatesOnDates(ctx context.Context, pool db.Executor, currency string, dates []string) (map[string]float64, error)
+	BenchmarkSeries(ctx context.Context, pool db.Executor, symbol string, dates []string) ([]PricePoint, error)
+	InstrumentsMeta(ctx context.Context, pool db.Executor, ids []string) (map[string]InstrumentMeta, error)
+}
+
+// InstrumentMeta — 바스켓 종목의 통화·자산군 (fx 적용 + INDEX/FX/CASH 가드용).
+type InstrumentMeta struct {
+	Symbol     string
+	Name       string
+	Currency   string // "KRW" | "USD"
+	AssetClass string // "KR_STOCK" | "US_STOCK" | "INDEX" | "FX" | "CASH" ...
 }
 
 // closeAt — idx 일자 종가 없으면 직전 영업일로 후퇴, 없으면 "__before", 그래도 없으면 0.

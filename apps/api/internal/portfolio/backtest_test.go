@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -217,4 +218,18 @@ func TestMetrics_LumpSum_TotalReturnAndCAGR(t *testing.T) {
 		t.Fatalf("cagr nil")
 	}
 	approx(t, *m.CAGRPct, 25.9921, 1e-2, "cagr pct ~ 26")
+}
+
+func TestPgDepsSatisfiesBacktestDeps(t *testing.T) {
+	// 컴파일 타임 인터페이스 만족 검사 — PgDeps가 BacktestDeps를 구현하는가.
+	var _ BacktestDeps = PgDeps{}
+
+	// InstrumentsMeta는 ids 비었을 때 Query 전에 단락 → DB 없이 검증 가능.
+	got, err := PgDeps{}.InstrumentsMeta(context.Background(), nil, nil)
+	if err != nil {
+		t.Fatalf("InstrumentsMeta(empty) err: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("want empty map, got %d entries", len(got))
+	}
 }
