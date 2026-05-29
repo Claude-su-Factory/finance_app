@@ -114,3 +114,34 @@ func TestSimulate_DCA_ContributionCount(t *testing.T) {
 		t.Errorf("negative cashflows=%d, want 37", neg)
 	}
 }
+
+func TestSimulate_Rebalance_RestoresTargetWeights(t *testing.T) {
+	// 분기 리밸런싱: t0=01-15, nextRebal=04-15. leg0 2배 상승 → 04-15에 50/50 복원.
+	days := []string{"2021-01-15", "2021-04-15", "2021-05-15"}
+	legs := []Leg{
+		{Weight: 0.5, Closes: map[string]float64{"2021-01-15": 100, "2021-04-15": 200, "2021-05-15": 200}},
+		{Weight: 0.5, Closes: map[string]float64{"2021-01-15": 100, "2021-04-15": 100, "2021-05-15": 50}},
+	}
+	out := simulate(days, legs, Plan{Initial: 1_000_000}, RebalanceQuarterly)
+
+	// 04-15: 리밸런싱은 총 평가액 보존 (1.5M)
+	approx(t, out.Equity[1].Value, 1_500_000, 1e-6, "equity on rebalance day")
+	// 05-15: 리밸런싱된 주식수(leg0=3750, leg1=7500)로 평가 → 1,125,000.
+	// (리밸런싱 없었다면 5000/5000 → 1,250,000)
+	approx(t, out.Equity[2].Value, 1_125_000, 1e-6, "equity reflects restored weights")
+}
+
+func TestSimulate_DCAplusRebalance_OrderCorrect(t *testing.T) {
+	// 04-15는 적립일(+1m 커서가 도달)이자 분기 리밸런싱일. 적립 먼저 → 리밸런싱은 적립 후 V 사용.
+	days := []string{"2021-01-15", "2021-04-15"}
+	legs := []Leg{
+		{Weight: 0.5, Closes: map[string]float64{"2021-01-15": 100, "2021-04-15": 200}},
+		{Weight: 0.5, Closes: map[string]float64{"2021-01-15": 100, "2021-04-15": 100}},
+	}
+	out := simulate(days, legs, Plan{Initial: 1_000_000, Monthly: 300_000}, RebalanceQuarterly)
+
+	// 적립 후 V=1.8M (1.5M 평가 + 300k 투입). 리밸런싱이 이 1.8M을 배분 → Equity=1.8M.
+	// 버그(캐시된 1.5M 사용) 시 300k 미배분 → 1.5M.
+	approx(t, out.Equity[1].Value, 1_800_000, 1e-6, "contribution allocated before rebalance")
+	approx(t, out.TotalContributed, 1_300_000, 1e-6, "totalContributed = 1M + 300k")
+}

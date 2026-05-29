@@ -105,7 +105,20 @@ func addMonthsClamped(t0 string, k int) string {
 	return time.Date(y, m, day, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
 }
 
-// simulate — 순수 NAV/유닛 펀드 회계 시뮬 (DB 무관). T1: 일시불. T2: DCA 적립. 리밸런싱은 T3.
+// rebalanceMonths — 리밸런싱 주기를 개월 수로 변환. RebalanceNone이면 0.
+func rebalanceMonths(rb Rebalance) int {
+	switch rb {
+	case RebalanceQuarterly:
+		return 3
+	case RebalanceSemiannual:
+		return 6
+	case RebalanceAnnual:
+		return 12
+	}
+	return 0
+}
+
+// simulate — 순수 NAV/유닛 펀드 회계 시뮬 (DB 무관). T1: 일시불. T2: DCA 적립. T3: 리밸런싱.
 func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutput {
 	n := len(tradingDays)
 	out := SimOutput{
@@ -131,17 +144,22 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 	totalContributed := plan.Initial
 	cashflows := []Cashflow{{Amount: -plan.Initial, Date: t0}}
 
-	// 적립 커서 — t0 당일은 적립 없음, 첫 적립은 t0+1개월(또는 직후 첫 영업일).
 	contribCount := 0
 	nextContrib := ""
 	if plan.Monthly > 0 {
 		contribCount = 1
 		nextContrib = addMonthsClamped(t0, 1)
 	}
+	rbMonths := rebalanceMonths(rb)
+	rebalCount := 0
+	nextRebal := ""
+	if rbMonths > 0 {
+		rebalCount = 1
+		nextRebal = addMonthsClamped(t0, rbMonths)
+	}
 
 	for idx, d := range tradingDays {
-		// 적립: 현재 NAV로 유닛 발행 → NAV 불변. 발생일 1회만(단일 advance).
-		// 전제: tradingDays는 일 단위 공통 축이므로 연속 영업일이 여러 앵커를 건너뛰지 않음(다월 공백 없음).
+		// 1) 적립 먼저 — 현재 NAV로 유닛 발행 → NAV 불변.
 		if idx > 0 && nextContrib != "" && d >= nextContrib {
 			nav := portValue(legs, shares, tradingDays, idx) / fundUnits
 			if nav > 0 {
@@ -158,6 +176,20 @@ func simulate(tradingDays []string, legs []Leg, plan Plan, rb Rebalance) SimOutp
 			cashflows = append(cashflows, Cashflow{Amount: -plan.Monthly, Date: d})
 			contribCount++
 			nextContrib = addMonthsClamped(t0, contribCount)
+		}
+
+		// 2) 리밸런싱 나중 — 적립 반영 후 V 재계산(캐시 금지). 목표 비중 복원, V·NAV 불변.
+		if idx > 0 && nextRebal != "" && d >= nextRebal {
+			v := portValue(legs, shares, tradingDays, idx)
+			for i, leg := range legs {
+				px := closeAt(leg.Closes, tradingDays, idx)
+				fx := legFx(leg, tradingDays, idx)
+				if px > 0 && fx > 0 {
+					shares[i] = (v * leg.Weight) / (px * fx)
+				}
+			}
+			rebalCount++
+			nextRebal = addMonthsClamped(t0, rbMonths*rebalCount)
 		}
 
 		v := portValue(legs, shares, tradingDays, idx)
