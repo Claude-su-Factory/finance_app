@@ -26,6 +26,7 @@ func New(
 	alphaHandler *handlers.AlphaHandler,
 	journalHandler *handlers.JournalHandler,
 	paperHandler *handlers.PaperHandler,
+	backtestHandler *handlers.BacktestHandler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
@@ -75,6 +76,8 @@ func New(
 		r.Get("/v1/paper/transactions", paperHandler.ListTx)
 		r.Post("/v1/paper/transactions", paperHandler.Trade)
 		r.Post("/v1/paper/reset", paperHandler.Reset)
+
+		r.Post("/v1/backtest/run", backtestHandler.Run)
 	})
 
 	return r

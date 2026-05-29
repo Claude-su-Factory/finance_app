@@ -94,6 +94,9 @@ func main() {
 	equityComputer := portfolio.NewEquityComputer(portfolio.PgDeps{})
 	paperHandler := handlers.NewPaperHandler(paperRepo, journalRepo, equityComputer, pool)
 
+	backtestSvc := portfolio.NewBacktestService()
+	backtestHandler := handlers.NewBacktestHandler(backtestSvc, pool)
+
 	readyz := handlers.ReadyzHandler(pool)
 
 	// cron 워커 시작
@@ -118,6 +121,7 @@ func main() {
 			alphaHandler,
 			journalHandler,
 			paperHandler,
+			backtestHandler,
 		),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
