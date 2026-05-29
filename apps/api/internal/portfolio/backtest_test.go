@@ -505,6 +505,30 @@ func TestRun_FullCoverage_NoSpuriousWarning(t *testing.T) {
 	}
 }
 
+func TestRun_BenchmarkClamp_EmitsWarning(t *testing.T) {
+	days := genDays(t, "2024-01-01", 50)
+	deps := krStockDeps(days, []string{"id1"})
+	// KOSPI 벤치마크가 2024-01-16(days[15])부터만 존재 → 클램프 지배 + 경고 방출 기대.
+	deps.bench["KOSPI"] = benchPts(days[15:], 2000)
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-03-01"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 100}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	found := false
+	for _, w := range res.CoverageWarnings {
+		if w.Symbol == "KOSPI" && w.FirstAvailable == "2024-01-16" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("KOSPI 커버리지 경고 누락: %+v", res.CoverageWarnings)
+	}
+}
+
 func TestRestrictForwardFilled_SeedsFromBeforeSentinel(t *testing.T) {
 	// "__before"(윈도우 직전 폴백)만 있고 clampStart 당일 실데이터가 없을 때,
 	// densify 결과가 폴백값으로 시드되어야 한다(엔진 lookupFxForward 계약과 일치 → 1.0 오평가 방지).

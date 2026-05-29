@@ -694,6 +694,21 @@ func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req Backtes
 		}
 	}
 
+	if kf := benchFirst(kospiPts); kf > naturalStart {
+		warnings = append(warnings, CoverageWarning{
+			Symbol:         "KOSPI",
+			FirstAvailable: kf,
+			Message:        "비교 지수(KOSPI) 데이터가 " + kf + "부터 존재해 시작일을 조정했습니다",
+		})
+	}
+	if sf := benchFirst(spxPts); sf > naturalStart {
+		warnings = append(warnings, CoverageWarning{
+			Symbol:         "S&P 500",
+			FirstAvailable: sf,
+			Message:        "비교 지수(S&P 500) 데이터가 " + sf + "부터 존재해 시작일을 조정했습니다",
+		})
+	}
+
 	kospiCloses := restrictForwardFilled(benchCloseMap(kospiPts), allDays, clampedDays)
 	spxCloses := restrictForwardFilled(benchCloseMap(spxPts), allDays, clampedDays)
 	spxFx := restrictForwardFilled(usdFx, allDays, clampedDays)
