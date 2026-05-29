@@ -2,9 +2,12 @@ package portfolio
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/quotient/quotient/apps/api/internal/db"
 )
 
 func approx(t *testing.T, got, want, eps float64, msg string) {
@@ -232,4 +235,236 @@ func TestPgDepsSatisfiesBacktestDeps(t *testing.T) {
 	if len(got) != 0 {
 		t.Fatalf("want empty map, got %d entries", len(got))
 	}
+}
+
+// --- 서비스 레이어 테스트 (BacktestDeps 모킹) ---
+
+type fakeBTDeps struct {
+	tradingDays []string                      // 정렬된 영업일 축
+	closes      map[string]map[string]float64 // iid → date → close
+	fx          map[string]map[string]float64 // currency → date → rate
+	bench       map[string][]PricePoint       // symbol(KOSPI/SPX) → 정렬된 종가
+	metas       map[string]InstrumentMeta     // iid → meta
+}
+
+func (f fakeBTDeps) TradingDays(_ context.Context, _ db.Executor, since, until time.Time) ([]string, error) {
+	s, u := since.Format("2006-01-02"), until.Format("2006-01-02")
+	var out []string
+	for _, d := range f.tradingDays {
+		if d >= s && d <= u {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+func (f fakeBTDeps) InstrumentClosesOnDates(_ context.Context, _ db.Executor, iid string, dates []string) (map[string]float64, error) {
+	src := f.closes[iid]
+	out := map[string]float64{}
+	for _, d := range dates {
+		if v, ok := src[d]; ok {
+			out[d] = v
+		}
+	}
+	return out, nil
+}
+
+func (f fakeBTDeps) FxRatesOnDates(_ context.Context, _ db.Executor, currency string, dates []string) (map[string]float64, error) {
+	if currency == "KRW" {
+		return map[string]float64{}, nil
+	}
+	src := f.fx[currency]
+	out := map[string]float64{}
+	for _, d := range dates {
+		if v, ok := src[d]; ok {
+			out[d] = v
+		}
+	}
+	return out, nil
+}
+
+func (f fakeBTDeps) BenchmarkSeries(_ context.Context, _ db.Executor, symbol string, dates []string) ([]PricePoint, error) {
+	set := map[string]bool{}
+	for _, d := range dates {
+		set[d] = true
+	}
+	var out []PricePoint
+	for _, p := range f.bench[symbol] {
+		if set[p.Date] {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (f fakeBTDeps) InstrumentsMeta(_ context.Context, _ db.Executor, ids []string) (map[string]InstrumentMeta, error) {
+	out := map[string]InstrumentMeta{}
+	for _, id := range ids {
+		if m, ok := f.metas[id]; ok {
+			out[id] = m
+		}
+	}
+	return out, nil
+}
+
+func genDays(t *testing.T, start string, n int) []string {
+	t.Helper()
+	base, err := time.Parse("2006-01-02", start)
+	if err != nil {
+		t.Fatalf("genDays parse: %v", err)
+	}
+	out := make([]string, n)
+	for i := 0; i < n; i++ {
+		out[i] = base.AddDate(0, 0, i).Format("2006-01-02")
+	}
+	return out
+}
+
+func constMap(days []string, v float64) map[string]float64 {
+	m := map[string]float64{}
+	for _, d := range days {
+		m[d] = v
+	}
+	return m
+}
+
+func benchPts(days []string, level float64) []PricePoint {
+	out := make([]PricePoint, len(days))
+	for i, d := range days {
+		out[i] = PricePoint{Date: d, Close: level}
+	}
+	return out
+}
+
+// 공통 벤치마크/메타 시드 — KR 단일 종목 전략용.
+func krStockDeps(days []string, ids []string) fakeBTDeps {
+	closes := map[string]map[string]float64{}
+	metas := map[string]InstrumentMeta{}
+	for i, id := range ids {
+		closes[id] = constMap(days, 100)
+		metas[id] = InstrumentMeta{Symbol: "00" + string(rune('A'+i)), Name: "종목" + string(rune('A'+i)), Currency: "KRW", AssetClass: "KR_STOCK"}
+	}
+	return fakeBTDeps{
+		tradingDays: days,
+		closes:      closes,
+		fx:          map[string]map[string]float64{"USD": constMap(days, 1300)},
+		bench:       map[string][]PricePoint{"KOSPI": benchPts(days, 2000), "SPX": benchPts(days, 4000)},
+		metas:       metas,
+	}
+}
+
+func TestRun_NormalizesWeights(t *testing.T) {
+	days := genDays(t, "2024-01-01", 40)
+	deps := krStockDeps(days, []string{"id1", "id2", "id3"})
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-02-15"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Monthly: 0, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 40}, {"id2", 30}, {"id3", 30}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	want := []float64{0.4, 0.3, 0.3}
+	for i, nl := range res.NormalizedBasket {
+		approx(t, nl.Weight, want[i], 1e-9, "normalized weight")
+	}
+	approx(t, res.EquitySeries[0].Value, 1_000_000, 1e-6, "equity[0] flat")
+	approx(t, res.Metrics.FinalEquity, 1_000_000, 1e-6, "final flat")
+}
+
+func TestRun_InsufficientData_422(t *testing.T) {
+	days := genDays(t, "2024-01-01", 10)
+	deps := krStockDeps(days, []string{"id1"})
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-02-15"))
+	_, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 100}},
+	})
+	var ie *InsufficientDataError
+	if !errors.As(err, &ie) {
+		t.Fatalf("want InsufficientDataError, got %v", err)
+	}
+	if ie.MinDays != 30 || ie.CurrentDays != 10 {
+		t.Errorf("ie=%+v, want Min=30 Current=10", ie)
+	}
+}
+
+func TestRun_ClampsStartToCommonWindow(t *testing.T) {
+	days := genDays(t, "2024-01-01", 45)
+	deps := krStockDeps(days, []string{"id1", "id2"})
+	// id2는 11번째 날(2024-01-11)부터만 데이터 존재 → 클램프 지배.
+	deps.closes["id2"] = map[string]float64{}
+	for _, d := range days[10:] {
+		deps.closes["id2"][d] = 100
+	}
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-02-20"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 50}, {"id2", 50}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	if res.ClampedStart != "2024-01-11" {
+		t.Errorf("clampedStart=%s, want 2024-01-11", res.ClampedStart)
+	}
+	found := false
+	for _, w := range res.CoverageWarnings {
+		if w.FirstAvailable == "2024-01-11" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("coverage_warnings missing clamp source: %+v", res.CoverageWarnings)
+	}
+}
+
+func TestRun_SPXBenchmark_AppliesUsdKrwFx(t *testing.T) {
+	days := genDays(t, "2024-01-01", 35)
+	deps := krStockDeps(days, []string{"id1"})
+	// USD fx: 첫날 1300, 마지막날 1430 (+10%). 중간은 전진 채움.
+	fx := constMap(days, 1300)
+	fx[days[len(days)-1]] = 1430
+	deps.fx["USD"] = fx
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-02-15"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Monthly: 0, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 100}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	spx := res.Benchmarks.Spx.EquitySeries
+	approx(t, spx[len(spx)-1].Value, 1_100_000, 1.0, "SPX 벤치마크 fx +10% 반영")
+	kospi := res.Benchmarks.Kospi.EquitySeries
+	approx(t, kospi[len(kospi)-1].Value, 1_000_000, 1.0, "KOSPI 벤치마크 fx=1.0 평탄")
+}
+
+func TestRun_BenchmarksUseSameCashflow(t *testing.T) {
+	days := genDays(t, "2024-01-01", 35)
+	deps := krStockDeps(days, []string{"id1"})
+	svc := newBacktestServiceWithDeps(deps, mustParse(t, "2024-02-15"))
+	res, err := svc.Run(context.Background(), nil, BacktestRequest{
+		Period: "all", InitialCash: 1_000_000, Monthly: 500_000, Rebalance: "none",
+		Basket: []BasketItem{{"id1", 100}},
+	})
+	if err != nil {
+		t.Fatalf("Run err: %v", err)
+	}
+	// 전 종목 가격 불변 → 평가액 == 누적 투입. 동일 plan → 전략·벤치마크 최종 동일.
+	approx(t, res.Metrics.TotalContributed, 1_500_000, 1e-6, "초기 1M + 적립 1회 500k")
+	approx(t, res.Metrics.FinalEquity, 1_500_000, 1e-6, "flat → final == contributed")
+	kospi := res.Benchmarks.Kospi.EquitySeries
+	spx := res.Benchmarks.Spx.EquitySeries
+	approx(t, kospi[len(kospi)-1].Value, 1_500_000, 1.0, "KOSPI 동일 현금흐름")
+	approx(t, spx[len(spx)-1].Value, 1_500_000, 1.0, "SPX 동일 현금흐름")
+}
+
+func mustParse(t *testing.T, s string) time.Time {
+	t.Helper()
+	tm, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		t.Fatalf("mustParse %s: %v", s, err)
+	}
+	return tm
 }

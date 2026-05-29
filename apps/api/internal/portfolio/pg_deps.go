@@ -191,3 +191,8 @@ func (PgDeps) InstrumentsMeta(ctx context.Context, pool db.Executor, ids []strin
 	}
 	return out, rows.Err()
 }
+
+// NewBacktestService는 production용 BacktestService. Pg 구현 주입.
+func NewBacktestService() *BacktestService {
+	return &BacktestService{deps: &PgDeps{}, now: time.Now}
+}

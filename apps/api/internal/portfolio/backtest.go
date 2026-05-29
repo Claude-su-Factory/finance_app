@@ -402,3 +402,323 @@ func xirr(cfs []Cashflow) *float64 {
 	mid := (lo + hi) / 2
 	return &mid
 }
+
+const minBacktestDays = 30
+
+// --- 요청/응답 타입 ---
+
+type BacktestRequest struct {
+	Period      string       `json:"period"`
+	InitialCash float64      `json:"initial_cash"`
+	Monthly     float64      `json:"monthly_contribution"`
+	Basket      []BasketItem `json:"basket"`
+	Rebalance   string       `json:"rebalance"`
+}
+
+type BasketItem struct {
+	InstrumentID string  `json:"instrument_id"`
+	Weight       float64 `json:"weight"`
+}
+
+type NormalizedLeg struct {
+	InstrumentID string  `json:"instrument_id"`
+	Symbol       string  `json:"symbol"`
+	Name         string  `json:"name"`
+	Weight       float64 `json:"weight"`
+}
+
+type BenchmarkResult struct {
+	EquitySeries []ValuePoint  `json:"equity_series"`
+	Metrics      SeriesMetrics `json:"metrics"`
+}
+
+type BenchmarkSet struct {
+	Kospi      BenchmarkResult `json:"kospi"`
+	Spx        BenchmarkResult `json:"spx"`
+	SixtyForty BenchmarkResult `json:"sixty_forty"`
+}
+
+// StrategyMetrics — 전략 metrics(§8). 벤치마크의 SeriesMetrics와 달리 excess·투입·최종 포함, twr 제외.
+type StrategyMetrics struct {
+	TotalReturnPct   float64  `json:"total_return_pct"`
+	CagrPct          *float64 `json:"cagr_pct"`
+	MddPct           float64  `json:"mdd_pct"`
+	VolatilityPct    float64  `json:"volatility_pct"`
+	ExcessVs6040Pct  float64  `json:"excess_vs_6040_pct"`
+	TotalContributed float64  `json:"total_contributed"`
+	FinalEquity      float64  `json:"final_equity"`
+}
+
+type CoverageWarning struct {
+	Symbol         string `json:"symbol"`
+	FirstAvailable string `json:"first_available"`
+	Message        string `json:"message"`
+}
+
+type BacktestResult struct {
+	ClampedStart      string            `json:"clamped_start"`
+	End               string            `json:"end"`
+	NormalizedBasket  []NormalizedLeg   `json:"normalized_basket"`
+	EquitySeries      []ValuePoint      `json:"equity_series"`
+	ContributedSeries []ValuePoint      `json:"contributed_series"`
+	Benchmarks        BenchmarkSet      `json:"benchmarks"`
+	Metrics           StrategyMetrics   `json:"metrics"`
+	CoverageWarnings  []CoverageWarning `json:"coverage_warnings"`
+}
+
+// ValidationError — 422 구분 가능 에러. Code ∈ {VALIDATION, ASSET_NOT_SUPPORTED}.
+type ValidationError struct {
+	Code    string
+	Message string
+}
+
+func (e *ValidationError) Error() string { return e.Code + ": " + e.Message }
+
+// --- 파싱/전진채움 헬퍼 ---
+
+func parseRebalance(s string) (Rebalance, error) {
+	switch s {
+	case "", "none":
+		return RebalanceNone, nil
+	case "quarterly":
+		return RebalanceQuarterly, nil
+	case "semiannual":
+		return RebalanceSemiannual, nil
+	case "annual":
+		return RebalanceAnnual, nil
+	}
+	return RebalanceNone, &ValidationError{Code: "VALIDATION", Message: "리밸런싱 값이 올바르지 않습니다"}
+}
+
+func periodStart(period string, today time.Time) (time.Time, error) {
+	switch period {
+	case "1Y":
+		return today.AddDate(-1, 0, 0), nil
+	case "3Y":
+		return today.AddDate(-3, 0, 0), nil
+	case "5Y", "all":
+		return today.AddDate(-5, 0, 0), nil
+	}
+	return time.Time{}, &ValidationError{Code: "VALIDATION", Message: "기간 값이 올바르지 않습니다"}
+}
+
+func benchFirst(pts []PricePoint) string {
+	if len(pts) == 0 {
+		return ""
+	}
+	return pts[0].Date // BenchmarkSeries는 order by date (오름차순)
+}
+
+func benchCloseMap(pts []PricePoint) map[string]float64 {
+	m := make(map[string]float64, len(pts))
+	for _, p := range pts {
+		m[p.Date] = p.Close
+	}
+	return m
+}
+
+// restrictForwardFilled — 희소 맵을 clampedDays 축으로 조밀화(전진 채움).
+// allDays(⊇clampedDays)를 순회하며 직전 유효값을 추적 → clampedDays 첫날(t0)도 클램프 이전 데이터로 시드.
+func restrictForwardFilled(sparse map[string]float64, allDays, clampedDays []string) map[string]float64 {
+	clampSet := make(map[string]bool, len(clampedDays))
+	for _, d := range clampedDays {
+		clampSet[d] = true
+	}
+	out := make(map[string]float64, len(clampedDays))
+	last := 0.0
+	have := false
+	for _, d := range allDays {
+		if v, ok := sparse[d]; ok && v > 0 {
+			last = v
+			have = true
+		}
+		if clampSet[d] && have {
+			out[d] = last
+		}
+	}
+	return out
+}
+
+// --- 서비스 ---
+
+type BacktestService struct {
+	deps BacktestDeps
+	now  func() time.Time
+}
+
+func newBacktestServiceWithDeps(deps BacktestDeps, fixedNow time.Time) *BacktestService {
+	return &BacktestService{deps: deps, now: func() time.Time { return fixedNow }}
+}
+
+// Run — 바스켓·벤치마크 해석 + 클램프 + 4× simulate + 지표. pool은 슈퍼유저 공개 read(인증만, RLS X).
+func (s *BacktestService) Run(ctx context.Context, pool db.Executor, req BacktestRequest) (*BacktestResult, error) {
+	rb, err := parseRebalance(req.Rebalance)
+	if err != nil {
+		return nil, err
+	}
+	today := s.now()
+	requestedStart, err := periodStart(req.Period, today)
+	if err != nil {
+		return nil, err
+	}
+	reqStartStr := requestedStart.Format("2006-01-02")
+
+	// 메타 조회 + 자산군 가드 + 비중 합
+	ids := make([]string, len(req.Basket))
+	for i, b := range req.Basket {
+		ids[i] = b.InstrumentID
+	}
+	metas, err := s.deps.InstrumentsMeta(ctx, pool, ids)
+	if err != nil {
+		return nil, err
+	}
+	var sumW float64
+	for _, b := range req.Basket {
+		m, ok := metas[b.InstrumentID]
+		if !ok {
+			return nil, &ValidationError{Code: "VALIDATION", Message: "종목을 찾을 수 없습니다"}
+		}
+		switch m.AssetClass {
+		case "INDEX", "FX", "CASH":
+			return nil, &ValidationError{Code: "ASSET_NOT_SUPPORTED", Message: "지수·환율은 백테스트 불가"}
+		}
+		sumW += b.Weight
+	}
+	if sumW <= 0 {
+		return nil, &ValidationError{Code: "VALIDATION", Message: "비중은 0보다 커야 합니다"}
+	}
+
+	allDays, err := s.deps.TradingDays(ctx, pool, requestedStart, today)
+	if err != nil {
+		return nil, err
+	}
+	if len(allDays) == 0 {
+		return nil, &InsufficientDataError{Reason: "no_trading_days", MinDays: minBacktestDays, CurrentDays: 0}
+	}
+
+	type legData struct {
+		item   BasketItem
+		meta   InstrumentMeta
+		closes map[string]float64
+		fx     map[string]float64
+		first  string
+	}
+	clampStart := reqStartStr // 문자열(YYYY-MM-DD) 사전순 비교 = 시간순 max
+	rows := make([]legData, 0, len(req.Basket))
+	for _, b := range req.Basket {
+		m := metas[b.InstrumentID]
+		closes, err := s.deps.InstrumentClosesOnDates(ctx, pool, b.InstrumentID, allDays)
+		if err != nil {
+			return nil, err
+		}
+		fx, err := s.deps.FxRatesOnDates(ctx, pool, m.Currency, allDays)
+		if err != nil {
+			return nil, err
+		}
+		first := firstAvailable(closes)
+		if first == "" {
+			return nil, &InsufficientDataError{Reason: "no_prices", MinDays: minBacktestDays, CurrentDays: 0}
+		}
+		if first > clampStart {
+			clampStart = first
+		}
+		if m.Currency != "KRW" {
+			if ff := firstAvailable(fx); ff != "" && ff > clampStart {
+				clampStart = ff // USD leg fx firstAvailable도 포함 (§5-5)
+			}
+		}
+		rows = append(rows, legData{item: b, meta: m, closes: closes, fx: fx, first: first})
+	}
+
+	kospiPts, err := s.deps.BenchmarkSeries(ctx, pool, "KOSPI", allDays)
+	if err != nil {
+		return nil, err
+	}
+	spxPts, err := s.deps.BenchmarkSeries(ctx, pool, "SPX", allDays)
+	if err != nil {
+		return nil, err
+	}
+	usdFx, err := s.deps.FxRatesOnDates(ctx, pool, "USD", allDays)
+	if err != nil {
+		return nil, err
+	}
+	if kf := benchFirst(kospiPts); kf != "" && kf > clampStart {
+		clampStart = kf
+	}
+	if sf := benchFirst(spxPts); sf != "" && sf > clampStart {
+		clampStart = sf
+	}
+
+	clampedDays := make([]string, 0, len(allDays))
+	for _, d := range allDays {
+		if d >= clampStart {
+			clampedDays = append(clampedDays, d)
+		}
+	}
+	if len(clampedDays) < minBacktestDays {
+		return nil, &InsufficientDataError{Reason: "backtest_window_too_short", MinDays: minBacktestDays, CurrentDays: len(clampedDays)}
+	}
+
+	stratLegs := make([]Leg, len(rows))
+	normalized := make([]NormalizedLeg, len(rows))
+	var warnings []CoverageWarning
+	for i, ld := range rows {
+		w := ld.item.Weight / sumW
+		var fxMap map[string]float64
+		if ld.meta.Currency != "KRW" {
+			fxMap = restrictForwardFilled(ld.fx, allDays, clampedDays)
+		}
+		stratLegs[i] = Leg{
+			Weight:  w,
+			Closes:  restrictForwardFilled(ld.closes, allDays, clampedDays),
+			FxToKRW: fxMap,
+		}
+		normalized[i] = NormalizedLeg{InstrumentID: ld.item.InstrumentID, Symbol: ld.meta.Symbol, Name: ld.meta.Name, Weight: w}
+		if ld.first > reqStartStr {
+			warnings = append(warnings, CoverageWarning{
+				Symbol:         ld.meta.Symbol,
+				FirstAvailable: ld.first,
+				Message:        "데이터가 " + ld.first + "부터 존재해 시작일을 조정했습니다",
+			})
+		}
+	}
+
+	kospiCloses := restrictForwardFilled(benchCloseMap(kospiPts), allDays, clampedDays)
+	spxCloses := restrictForwardFilled(benchCloseMap(spxPts), allDays, clampedDays)
+	spxFx := restrictForwardFilled(usdFx, allDays, clampedDays)
+	kospiLeg := Leg{Weight: 1.0, Closes: kospiCloses}
+	spxLeg := Leg{Weight: 1.0, Closes: spxCloses, FxToKRW: spxFx}
+	leg6040 := []Leg{{Weight: 0.6, Closes: kospiCloses}, {Weight: 0.4, Closes: spxCloses, FxToKRW: spxFx}}
+
+	plan := Plan{Initial: req.InitialCash, Monthly: req.Monthly}
+	strat := simulate(clampedDays, stratLegs, plan, rb)
+	kospi := simulate(clampedDays, []Leg{kospiLeg}, plan, rb)
+	spx := simulate(clampedDays, []Leg{spxLeg}, plan, rb)
+	s6040 := simulate(clampedDays, leg6040, plan, rb)
+
+	sm := metrics(strat)
+	m6040 := metrics(s6040)
+
+	return &BacktestResult{
+		ClampedStart:      clampStart,
+		End:               today.Format("2006-01-02"),
+		NormalizedBasket:  normalized,
+		EquitySeries:      strat.Equity,
+		ContributedSeries: strat.Contributed,
+		Benchmarks: BenchmarkSet{
+			Kospi:      BenchmarkResult{EquitySeries: kospi.Equity, Metrics: metrics(kospi)},
+			Spx:        BenchmarkResult{EquitySeries: spx.Equity, Metrics: metrics(spx)},
+			SixtyForty: BenchmarkResult{EquitySeries: s6040.Equity, Metrics: m6040},
+		},
+		Metrics: StrategyMetrics{
+			TotalReturnPct:   sm.TotalReturnPct,
+			CagrPct:          sm.CAGRPct,
+			MddPct:           sm.MDDPct,
+			VolatilityPct:    sm.VolatilityPct,
+			ExcessVs6040Pct:  sm.TWRPct - m6040.TWRPct,
+			TotalContributed: strat.TotalContributed,
+			FinalEquity:      strat.FinalEquity,
+		},
+		CoverageWarnings: warnings,
+	}, nil
+}
