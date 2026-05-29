@@ -25,7 +25,7 @@ export function CashInputs({
           type="number"
           min={0}
           value={initialCash}
-          onChange={(e) => onInitialCash(Number(e.target.value))}
+          onChange={(e) => onInitialCash(Number(e.target.value) || 0)}
           className="bg-bg-deep border border-line px-3 py-1.5 text-sm font-mono w-full tabular-nums"
         />
       </label>
@@ -47,7 +47,7 @@ export function CashInputs({
           min={0}
           value={monthly}
           disabled={mode === "lump"}
-          onChange={(e) => onMonthly(Number(e.target.value))}
+          onChange={(e) => onMonthly(Number(e.target.value) || 0)}
           className="bg-bg-deep border border-line px-3 py-1.5 text-sm font-mono w-full tabular-nums disabled:opacity-40"
         />
       </label>

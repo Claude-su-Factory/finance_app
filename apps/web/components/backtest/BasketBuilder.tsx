@@ -49,7 +49,7 @@ export function BasketBuilder({
               type="number"
               min={0}
               value={r.weight}
-              onChange={(e) => setWeight(r.inst.id, Number(e.target.value))}
+              onChange={(e) => setWeight(r.inst.id, Number(e.target.value) || 0)}
               className="w-16 bg-bg-deep border border-line px-2 py-1 text-sm font-mono text-right tabular-nums"
               aria-label={`${r.inst.symbol} 비중`}
             />
