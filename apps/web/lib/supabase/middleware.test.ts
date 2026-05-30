@@ -57,4 +57,12 @@ describe("updateSession 온보딩 쿠키 캐시", () => {
     expect(res.headers.get("location")).toContain("/app/onboarding");
     expect(res.cookies.get("q_onboarded")?.value).toBeUndefined();
   });
+
+  it("profiles 조회 실패(profile=null): 리다이렉트·쿠키 발급 없이 통과", async () => {
+    singleMock.mockResolvedValue({ data: null });
+    const res = await updateSession(makeRequest("/app"));
+    expect(fromMock).toHaveBeenCalledTimes(1);
+    expect(res.headers.get("location")).toBeNull();
+    expect(res.cookies.get("q_onboarded")?.value).toBeUndefined();
+  });
 });

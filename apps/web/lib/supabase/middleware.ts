@@ -34,6 +34,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 온보딩 미완료 사용자가 /app/* 접근 시 /app/onboarding으로 (단, /app/onboarding 자체는 통과)
+  // read-through 쿠키 캐시: onboarding_completed은 단조(false→true 전이만)라 q_onboarded=1 쿠키는 무조건 신뢰 가능
+  // → 매 /app/* 요청의 profiles 조회(N+1)를 제거. profile=null(조회 실패)이면 쿠키 미발급 → 다음 요청에서 재조회(안전한 degrade).
   if (
     user &&
     request.nextUrl.pathname.startsWith("/app") &&
