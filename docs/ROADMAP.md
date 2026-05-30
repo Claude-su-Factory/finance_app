@@ -2,17 +2,18 @@
 
 ## 현재 추천 다음 작업
 
-알파 카드 · AI 매매 일기 · Paper Trading (라이브) · 백테스트(서브시스템 B) · AI 교육자 역할 출시 완료. 3축 정체성 + 백테스트 약속 모두 충족. 다음:
-
-1. **운영 자동화** — 부팅 시 지수 자동 백필(비동기·실패 무시) + `release_command` 마이그레이션. 사용자 액션을 "계정·키 1회 셋업"으로 압축
+모든 코드 작업 완료. 남은 작업은 외부 계정·키 발급(사용자 액션)뿐이다.
 
 (CSV import는 드롭(2026-05-29). 사유: 유일 가치가 "실 자산 초기 입력 절감"뿐인데 증권사별 포맷 파싱 유지보수 비용 과다. 실 자산 입력은 수동 UX + Phase 3 KIS Open API 자동 동기화로 대체.)
 (AI 교육자 역할 완료(2026-05-29): 개념 질문 친절 답변 + footer 게이팅. STATUS 참조.)
 (백테스트 완료(2026-05-29): NAV/유닛 통합 바스켓 시뮬레이터 + KOSPI·S&P·60/40 비교. STATUS 참조.)
 (백테스트 커버리지 경고 결함 fix 완료(2026-05-30): 경고 기준선을 `naturalStart`로 교정 + 벤치마크·fx 사유 경고 추가. STATUS 참조.)
 (미들웨어 N+1 제거 완료(2026-05-30): read-through 쿠키 캐시(`q_onboarded`)로 매 `/app/*` profiles 조회 제거. 단조 플래그 → 캐시 안전. STATUS 참조.)
+(운영 자동화 완료(2026-05-30): 부팅 시 지수·NASDAQ 자동 백필(`SeedIfEmpty`, 비동기·멱등) + Fly `release_command` Go 마이그레이터(이력 테이블 공유). 사용자 수동 ops 0. STATUS 참조.)
 
-병행으로 남아 있는 외부 계정·키 발급 (사용자 액션):
+**현재 추천 다음 작업**: 아래 외부 계정·키 발급을 순서대로 완료하면 production 배포가 가능하다.
+
+외부 계정·키 발급 (사용자 액션):
 
 1. **Supabase 프로덕션 프로젝트** — region `ap-northeast-2` 생성 + `supabase db push` → DATABASE_URL·SUPABASE_JWT_SECRET 확보 (`docs/DEPLOY.md` §2)
 2. **Fly.io API 배포** — 계정 + `flyctl secrets set` + `flyctl deploy` (`docs/DEPLOY.md` §3)

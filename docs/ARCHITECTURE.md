@@ -177,5 +177,21 @@ LOCAL 적용한다. cron 잡·도구 레지스트리·공개 read(market/instrum
 
 **Trade-off**: 단조 플래그라 stale·위조 쿠키도 안전 방향으로만 작용 — 위조 시 자기 온보딩 화면을 스킵하는 것이 최악(쓰기·타 사용자 영향 없음). 서버측 무효화 수단은 없으나 단조성으로 불필요. JWT custom claim 캐싱 대안 대비 Supabase Auth 재발급 흐름 무변경 + USER_ACTION 0.
 
+### 13. 부팅 시 멱등 자동 백필 (`SeedIfEmpty`)
+
+**Why**: 수동 백필 CLI 의무(`flyctl ssh console -C "/app/backfill ..."`)를 제거해 신규 환경 셋업을 "계정·키 1회 입력"으로 압축한다. 부팅·readiness를 가용성 최우선으로 — 백필 완료를 기다리지 않는다.
+
+**How**: `internal/backfill.SeedIfEmpty(ctx, pool, years)`를 `cmd/server/main.go`에서 cron 워커 시작 직후 fire-and-forget 고루틴으로 실행한다. 내부적으로 NASDAQ 시드 종목을 먼저 upsert한 뒤, INDEX + NASDAQ 전 종목 중 `public.prices` 행이 0개인 시리즈에 한해 Yahoo로 ~5년 일봉을 백필(per-series only-if-empty). 이미 행이 있으면 skip → 크로스-부팅 self-heal. 실패는 `observability.CaptureException`으로 Sentry에 전송하고 로그 기록 후 계속 — 서버 크래시 없음, readiness 차단 없음.
+
+**Trade-off**: 첫 부팅 후 백필이 완료되기 전까지 알파 카드·백테스트가 "데이터 부족"으로 노출될 수 있다(수 분 이내). 허용 가능한 trade-off로 판단.
+
+### 14. release_command Go 마이그레이터
+
+**Why**: 배포마다 수동 `supabase db push`를 실행하는 단계를 제거하고 스키마-코드 정합성을 fail-closed로 보장한다. 깨진 마이그레이션이 있으면 서버 교체 자체가 중단되어 구버전이 유지된다.
+
+**How**: `cmd/migrate`가 `/app/migrate` 바이너리로 빌드된다. `supabase_migrations.schema_migrations` 이력 테이블을 Supabase CLI와 공유해 이미 적용된 마이그레이션은 skip한다. `supabase/migrations/*.sql`을 파일명(timestamp) 순으로 정렬해 pending 항목을 하나씩 단일 트랜잭션으로 실행(pgx: 다중 statement는 인자 0개 `Exec` simple protocol로 전송). 비0 exit 시 Fly가 배포를 중단한다. 빌드 컨텍스트를 레포 루트로 이전해 `supabase/migrations`를 이미지 `/app/migrations`에 COPY. Fly `fly.toml`에 `[deploy] release_command = "/app/migrate"` 등록.
+
+**제약**: 마이그레이션 SQL은 트랜잭션-안전이어야 한다 — standalone `BEGIN;/COMMIT;` 금지, `CREATE INDEX CONCURRENTLY` 금지. 이러한 구문이 필요하면 마이그레이터에 no-tx 경로를 먼저 추가해야 한다.
+
 ---
 업데이트 규칙: 새 컴포넌트·중대 설계 변경에만 추가. Why를 반드시 명시. 변경이력은 STATUS의 "최근 변경 이력"에 동시 기록.

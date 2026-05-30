@@ -10,16 +10,9 @@
 
 ## 🔴 시급 — 다음 기능 동작에 필요
 
-- [ ] **지수 5년 백필 (KOSPI·KOSDAQ·SPX·NDX·DJI)** — *알파 카드 동작 전제*
-  - 로컬: `cd apps/api && set -a; source .env; set +a; go run ./cmd/backfill --market=INDICES --years=5`
-  - 운영: `flyctl ssh console -C "/app/backfill --market=INDICES --years=5"`
-  - 1회 실행. ~5분 소요. 미실행 시 알파 카드는 "데이터 부족"으로 빈 상태.
+*(이 절의 모든 백필·마이그레이션 항목은 자동화 완료. 부팅 시 `SeedIfEmpty`가 KOSPI·KOSDAQ·SPX·NDX 지수 + NASDAQ 30 시드를 자동 백필하며, 스키마 마이그레이션은 Fly `release_command`(`/app/migrate`)가 자동 적용한다. 수동 실행 불필요.)*
 
-- [ ] **백테스트 대상 종목 가격 백필** — *백테스트 동작 전제 (spec §3-3)*
-  - KOSPI·KOSDAQ 전종목 + 지수는 W2b 백필 CLI로 적재됨. **NASDAQ은 시드 30종목만** 보유 → 그 외 미국 종목을 바스켓에 넣으면 클램프되거나 "데이터 부족"으로 거부될 수 있음.
-  - 미국 종목 백필: `cd apps/api && set -a; source .env; set +a; go run ./cmd/backfill --market=NASDAQ --years=5` (대상 확장은 백필 CLI의 NASDAQ 시드 목록 편집)
-  - 운영: `flyctl ssh console -C "/app/backfill --market=NASDAQ --years=5"`
-  - 지수 백필(위 항목)이 선행돼야 벤치마크 3종(KOSPI·S&P·60/40)이 그려진다.
+> ⚠️ **마이그레이션 SQL 작성 주의**: `release_command`는 비0 exit 시 해당 배포 전체를 중단(fail-closed)한다. 마이그레이션 SQL은 트랜잭션-안전이어야 한다 — standalone `BEGIN;/COMMIT;` 포함 금지, `CREATE INDEX CONCURRENTLY` 금지. 이러한 구문이 필요하면 마이그레이터에 no-tx 경로를 먼저 추가해야 한다.
 
 ---
 
@@ -30,7 +23,7 @@
 ### 외부 계정 가입 (결제 카드 필요)
 
 - [ ] **Fly.io 계정** — `flyctl auth login` ($5/mo free credit, 결제 카드 등록 필수)
-- [ ] **Supabase Cloud 프로젝트** — region `ap-northeast-2`, `supabase link --project-ref <ref>` + `supabase db push`
+- [ ] **Supabase Cloud 프로젝트** — region `ap-northeast-2`, `supabase link --project-ref <ref>` (스키마 마이그레이션은 Fly `release_command`가 자동 적용 — 수동 `supabase db push` 불필요)
 - [ ] **Vercel 계정** — GitHub repo 연결 (`apps/web` Root Directory 지정 필수)
 - [ ] **Anthropic API 키** — `sk-ant-...` 발급 (결제 카드 필요)
 - [ ] **Sentry 프로젝트 2개** (Go + Next.js) — DSN 발급 (옵션, Developer Free)
@@ -71,7 +64,8 @@
 ### 배포 후 검증
 
 - [ ] **E2E 스모크 시나리오 9단계** — [`docs/E2E_SMOKE.md`](E2E_SMOKE.md) 통과
-- [ ] **production 지수 백필** — Fly machine 안에서 `flyctl ssh console -C "/app/backfill --market=INDICES --years=5"`
+
+> 참고: `/app/backfill` CLI는 여전히 존재하며 `flyctl ssh console -C "/app/backfill --market=INDICES --years=5"` 형태로 수동 전체 재백필이 가능하다. 단, 첫 배포 시 필수 단계가 아니다 — 부팅 시 `SeedIfEmpty`가 자동 처리한다.
 
 ---
 
@@ -99,4 +93,7 @@
 
 (완료 항목 이동 — 가장 최근이 위)
 
-(아직 없음)
+- ~~**지수 5년 백필 (KOSPI·KOSDAQ·SPX·NDX)**~~ — 부팅 시 `SeedIfEmpty` 자동 처리로 대체(2026-05-30)
+- ~~**백테스트 대상 종목 가격 백필 (NASDAQ 시드)**~~ — 부팅 시 `SeedIfEmpty` 자동 처리로 대체(2026-05-30)
+- ~~**production 지수 백필** (`flyctl ssh console -C "/app/backfill ..."`)~~ — 부팅 자동화로 필수 단계 해제(2026-05-30)
+- ~~**`supabase db push` (스키마 적용)**~~ — Fly `release_command` (`/app/migrate`) 자동 적용으로 대체(2026-05-30)

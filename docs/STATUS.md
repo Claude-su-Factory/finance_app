@@ -1,6 +1,6 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-05-30
+마지막 업데이트: 2026-05-30 (운영 자동화 반영)
 
 ## 현재 Phase
 
@@ -55,6 +55,7 @@
 - ✅ W2b-T9·10·11 마켓 API (/v1/market/ticker, /v1/instruments/search·select) + cron 워커 main.go 통합 (`a6f75e0`)
 - ✅ W2b-T12 TopTicker 실데이터 + visibility skip (`951690c`)
 - ✅ W2b-T13 5년 백필 CLI (cmd/backfill) (`d2c24e3`)
+- ✅ 운영 자동화 — A) 부팅 시 지수·NASDAQ 자동 백필 (`internal/backfill.SeedIfEmpty`, fire-and-forget 고루틴, per-series only-if-empty, 실패 로그+Sentry) + B) Fly release_command Go 마이그레이터 (`cmd/migrate`, `supabase_migrations.schema_migrations` 이력 공유, 마이그레이션당 트랜잭션, 비0 exit = 배포 중단)
 - ✅ W3-T1 holdings + watchlist 마이그레이션 + RLS 7개 (`3dd1c97`)
 - ✅ W3-T1.5 middleware.WithUserID helper (`d52473b`)
 - ✅ W3-T2 holdings·watchlist 모델 (enriched 포함) (`17a61fa`)
@@ -114,6 +115,7 @@
 - ~~**US 장중 NY Friday 후반 세션 누락**~~ — **2026-05-27 해결**: `IsUSMarketOpen`을 NY 타임존 기반으로 변경. KST 토요일 새벽이 NY 금요일 장중이면 자동 true.
 - ~~**US 장중 DST 미반영**~~ — **2026-05-27 해결**: `time.LoadLocation("America/New_York")` 사용 → DST 자동 적용 (EST/EDT 전환).
 - **fx_rates change_pct 첫날 0**: frankfurter 일별 갱신. 첫 배포로 fx_rates에 오늘 행만 있으면 change_pct=0 (다음 영업일 정상화)
+- **알파 카드 USD 레그 역사적 FX 부재 (신규 DB)**: 알파 카드는 USD 보유 종목을 KRW로 환산할 때 `public.fx_rates`의 날짜별 USD/KRW를 사용한다(`PgDeps.FxRatesOnDates`). 그러나 `fx_rates`는 일간 cron(`JobUpdateFXRates`)이 당일 스팟 환율만 기록하며, `SeedIfEmpty`의 백필 대상이 아니다. 따라서 신규 DB에서는 과거 날짜의 USD/KRW가 없어 forward-fill → `__before` fallback → fx=1.0으로 폴백되어 USD 레그 수익률이 부정확하다. 약 1년치 cron 데이터가 쌓일 때까지 지속. 근본 원인: 역사적 FX 소스 부재(사전 존재 결함). 수정 옵션: (a) 역사적 USD/KRW 백필 소스 추가, 또는 (b) UI에 "FX 데이터 부족" 경고 표시.
 - ~~**포트폴리오 우측 sliding panel 미구현**~~ — **2026-05-27 해결**: HoldingDetailPanel — 행 클릭 시 우측 슬라이드, 30일 차트 + 보유 상세 + 수정/삭제 액션. ESC·backdrop 닫기, 선택 행 하이라이트.
 - **AdSense 미가입**: AdSlot은 `NEXT_PUBLIC_ENABLE_ADS=false` 기본 → placeholder만. 가입자 100명·일평균 PV 500 도달 시 Phase 2에서 활성
 - ~~**AI RealClient 미구현**~~ — **2026-05-27 해결**: anthropic-sdk-go v1.45 실 구현 완료. `ANTHROPIC_API_KEY` 설정 시 자동 활성, adaptive thinking(4.6/4.7)·prompt caching·tool streaming·SSE 끊김 ctx 감시 모두 포함
@@ -126,6 +128,7 @@
 
 ## 최근 변경 이력
 
+- 2026-05-30 운영 자동화: 부팅 시 지수·NASDAQ 자동 백필(SeedIfEmpty, 비동기·멱등) + Fly release_command Go 마이그레이터(이력 테이블 공유).
 - 2026-05-30 미들웨어 N+1 제거 — `/app/*` 매 요청 `profiles.onboarding_completed` 조회를 read-through 쿠키 캐시로 제거. `onboarding_completed` 확인 시 `q_onboarded=1`(httpOnly·prod secure·sameSite lax·1년) 발급 → 이후 요청은 쿠키 있으면 조회 스킵. `auth.getUser()` 세션 검증은 매 요청 유지(쿠키는 프로필 조회만 단축, 인증 대체 X). 단조 플래그라 stale/위조 쿠키 무해(자기 온보딩 화면 스킵뿐). TDD 3 커밋(read-through write → read gate → 코드리뷰 반영) + 단위 테스트 4(write·skip·redirect·null degrade) + 스펙/코드 2단계 리뷰 APPROVED. 신규 USER_ACTION 0. `apps/web/lib/supabase/middleware.ts`.
 - 2026-05-30 백테스트 커버리지 경고 결함 fix — 시작일이 벤치마크(KOSPI·S&P 500) 또는 USD/KRW 환율 데이터 부족으로 조정될 때 `coverage_warnings`가 비어 `CoverageNotice`가 안 뜨던 결함 해소. 근본 원인은 경고 기준선이 `reqStartStr`(today−5Y)였던 것 → `naturalStart := allDays[0]`(윈도우 실제 첫 영업일)로 교정. 이 한 변경이 (a) 모든 레그가 매 백테스트마다 경고를 띄우던 스푸리어스 버그와 (b) 벤치/fx 클램프 시 경고 누락을 동시 해결. 레그 루프 뒤 KOSPI·S&P 500·USD/KRW(USD 레그 게이트) 경고 블록 추가. 클램프 계산 로직은 무변경(이미 정상). 3 TDD 커밋 + 회귀 테스트 3 + 코드 리뷰 APPROVED. 프론트 변경 0. `internal/portfolio/backtest.go`.
 - 2026-05-29 백테스트(서브시스템 B) 출시 — `/app/backtest` 신규 탭(사이드바 History 아이콘). 선언적 바스켓(최대 10종목·실행 시 자동 정규화) + 2축 전략(투입: 일시불/월 적립 × 리밸런싱: 없음·분기·반기·연) 과거 시뮬레이션. NAV/유닛 펀드 회계로 적립 중립 수익률(TWR) + 단일 `simulate()`로 전략·KOSPI·S&P·한미 60/40 4종을 동일 캐시플로우·리밸런싱으로 실행 → 초과수익(vs 60/40). XIRR 머니가중 CAGR(Newton+이분법, 실패 시 null) + MDD + 변동성. 5년·종료일 오늘 클램프(레그별 최초 가용일 + USD 레그 fx 반영), <30일 INSUFFICIENT_DATA, 데이터 짧은 종목 커버리지 경고. 무상태(신규 테이블 0, 공개 가격·지수·환율만 슈퍼유저 풀 read — `db.AsUser`/RLS 불필요, 인증 게이트만). `internal/portfolio/backtest.go`(알파와 패키지 공존) + `POST /v1/backtest/run` + 5선 멀티라인 평가액 차트 + 비교표. 정체성 spec §1 3축의 '백테스트' 약속 완성. 라이브 Paper Trading과 별개 서브시스템.
