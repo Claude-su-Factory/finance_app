@@ -14,6 +14,7 @@ import (
 	"github.com/quotient/quotient/apps/api/internal/ai"
 	"github.com/quotient/quotient/apps/api/internal/ai/tools"
 	"github.com/quotient/quotient/apps/api/internal/auth"
+	"github.com/quotient/quotient/apps/api/internal/backfill"
 	"github.com/quotient/quotient/apps/api/internal/config"
 	"github.com/quotient/quotient/apps/api/internal/db"
 	"github.com/quotient/quotient/apps/api/internal/handlers"
@@ -108,6 +109,16 @@ func main() {
 		FRED:  fred.NewClient("", cfg.FREDAPIKey),
 		ECOS:  ecos.NewClient("", cfg.ECOSAPIKey),
 	}, aiClient, toolRegistry)
+
+	// 부팅 시 비어 있는 지수·NASDAQ 시리즈 자동 백필 (비동기·실패 무시).
+	// readiness·ListenAndServe를 절대 차단하지 않는다. 실패 시 로그+Sentry, 크래시 없음.
+	// lifecycle ctx를 전달 → graceful shutdown 시 진행 중 백필도 취소된다.
+	go func() {
+		if err := backfill.SeedIfEmpty(ctx, pool, 5); err != nil {
+			logger.Error("boot backfill failed (continuing)", "err", err)
+			observability.CaptureException(err)
+		}
+	}()
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
