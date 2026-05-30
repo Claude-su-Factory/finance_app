@@ -48,3 +48,27 @@ func TestPendingMigrationsAllApplied(t *testing.T) {
 		t.Errorf("len = %d, want 0", len(got))
 	}
 }
+
+func TestLoadRealMigrations(t *testing.T) {
+	// 실제 레포의 supabase/migrations 디렉터리(테스트 패키지 기준 상대경로).
+	migs, err := Load("../../../../supabase/migrations")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(migs) != 10 {
+		t.Fatalf("len = %d, want 10 (supabase/migrations 파일 수)", len(migs))
+	}
+	// 정렬·파싱 검증.
+	if migs[0].Version != "20260522000001" {
+		t.Errorf("first version = %q, want 20260522000001", migs[0].Version)
+	}
+	if migs[len(migs)-1].Version != "20260528000002" {
+		t.Errorf("last version = %q, want 20260528000002", migs[len(migs)-1].Version)
+	}
+	// SQL 본문이 비어 있지 않아야 한다.
+	for _, m := range migs {
+		if m.SQL == "" {
+			t.Errorf("%s: empty SQL", m.Name)
+		}
+	}
+}
