@@ -41,4 +41,20 @@ describe("updateSession 온보딩 쿠키 캐시", () => {
     expect(fromMock).toHaveBeenCalledTimes(1);
     expect(res.cookies.get("q_onboarded")?.value).toBe("1");
   });
+
+  it("온보딩 완료 + q_onboarded 쿠키: 인증은 검증하되 profiles 조회는 스킵", async () => {
+    singleMock.mockResolvedValue({ data: { onboarding_completed: true } });
+    await updateSession(makeRequest("/app", { q_onboarded: "1" }));
+    expect(getUserMock).toHaveBeenCalled();
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("온보딩 미완료 + 쿠키 없음: /app/onboarding으로 리다이렉트하고 쿠키를 굽지 않는다", async () => {
+    singleMock.mockResolvedValue({ data: { onboarding_completed: false } });
+    const res = await updateSession(makeRequest("/app"));
+    expect(fromMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/app/onboarding");
+    expect(res.cookies.get("q_onboarded")?.value).toBeUndefined();
+  });
 });

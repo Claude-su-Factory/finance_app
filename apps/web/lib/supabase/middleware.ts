@@ -34,7 +34,12 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 온보딩 미완료 사용자가 /app/* 접근 시 /app/onboarding으로 (단, /app/onboarding 자체는 통과)
-  if (user && request.nextUrl.pathname.startsWith("/app") && request.nextUrl.pathname !== "/app/onboarding") {
+  if (
+    user &&
+    request.nextUrl.pathname.startsWith("/app") &&
+    request.nextUrl.pathname !== "/app/onboarding" &&
+    request.cookies.get("q_onboarded")?.value !== "1"
+  ) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_completed")
