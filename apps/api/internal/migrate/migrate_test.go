@@ -55,20 +55,21 @@ func TestLoadRealMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if len(migs) != 10 {
-		t.Fatalf("len = %d, want 10 (supabase/migrations 파일 수)", len(migs))
+	// 마이그레이션 추가 시 깨지지 않도록 정확한 개수가 아닌 하한만 검증한다.
+	if len(migs) < 10 {
+		t.Fatalf("len = %d, want >= 10 (supabase/migrations 파일 수)", len(migs))
 	}
-	// 정렬·파싱 검증.
+	// 첫 파일(가장 오래된 버전)은 고정이다.
 	if migs[0].Version != "20260522000001" {
 		t.Errorf("first version = %q, want 20260522000001", migs[0].Version)
 	}
-	if migs[len(migs)-1].Version != "20260528000002" {
-		t.Errorf("last version = %q, want 20260528000002", migs[len(migs)-1].Version)
-	}
-	// SQL 본문이 비어 있지 않아야 한다.
-	for _, m := range migs {
+	// version 오름차순 정렬 + SQL 본문이 비어 있지 않은지 검증.
+	for i, m := range migs {
 		if m.SQL == "" {
 			t.Errorf("%s: empty SQL", m.Name)
+		}
+		if i > 0 && migs[i-1].Version > m.Version {
+			t.Errorf("not sorted: %s before %s", migs[i-1].Version, m.Version)
 		}
 	}
 }

@@ -61,6 +61,9 @@ func RunKR(ctx context.Context, pool *pgxpool.Pool, market string, years, limit 
 		}
 		syms = append(syms, x)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate: %w", err)
+	}
 	if limit > 0 && len(syms) > limit {
 		syms = syms[:limit]
 	}
@@ -109,6 +112,9 @@ func RunUS(ctx context.Context, pool *pgxpool.Pool, years, limit int) error {
 			return fmt.Errorf("scan: %w", err)
 		}
 		syms = append(syms, x)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate: %w", err)
 	}
 	if limit > 0 && len(syms) > limit {
 		syms = syms[:limit]
