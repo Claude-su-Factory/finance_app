@@ -48,3 +48,12 @@ func SentryMiddleware() func(http.Handler) http.Handler {
 func Flush() {
 	sentry.Flush(2 * time.Second)
 }
+
+// CaptureException은 비-HTTP 경로(부팅 백필·cron 등)에서 에러를 Sentry로 보고한다.
+// InitSentry가 초기화한 global hub를 사용한다. DSN 미설정 시 sentry-go 내부 no-op. nil-safe.
+func CaptureException(err error) {
+	if err == nil {
+		return
+	}
+	sentry.CaptureException(err)
+}
