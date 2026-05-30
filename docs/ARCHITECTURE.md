@@ -166,5 +166,16 @@ LOCAL 적용한다. cron 잡·도구 레지스트리·공개 read(market/instrum
 
 **Trade-off**: 전진 채움(forward-fill)으로 희소 가격을 클램프 축에 조밀화 — 결측 구간은 직전 종가 유지(룩어헤드 없음). 파라미터 최적화·전략 자동 추천은 규제·과적합 우려로 영구 제외(spec §13).
 
+### 12. 미들웨어 온보딩 게이트 — read-through 쿠키 캐시
+
+**Why**: Next.js 프록시 미들웨어가 `/app/*` 매 요청마다 `profiles.onboarding_completed`를 조회(N+1)했다. 온보딩 완료는 단조 상태(false→true 전이만)라 매 요청 DB를 칠 이유가 없다.
+
+**How**:
+- 미들웨어가 `onboarding_completed=true`를 한 번 확인하면 `q_onboarded=1` 쿠키 발급(httpOnly, prod에서만 secure, sameSite lax, path `/`, maxAge 1년). 이후 요청은 쿠키가 있으면 `if` 게이트(`request.cookies.get("q_onboarded")?.value !== "1"`)에서 조회를 통째로 스킵.
+- `auth.getUser()` 세션 검증은 게이트와 무관하게 매 요청 실행 — 쿠키는 프로필 조회만 단축하지 인증을 대체하지 않는다.
+- `profile=null`(조회 실패)이면 쿠키 미발급 → 다음 요청 재조회(안전한 degrade).
+
+**Trade-off**: 단조 플래그라 stale·위조 쿠키도 안전 방향으로만 작용 — 위조 시 자기 온보딩 화면을 스킵하는 것이 최악(쓰기·타 사용자 영향 없음). 서버측 무효화 수단은 없으나 단조성으로 불필요. JWT custom claim 캐싱 대안 대비 Supabase Auth 재발급 흐름 무변경 + USER_ACTION 0.
+
 ---
 업데이트 규칙: 새 컴포넌트·중대 설계 변경에만 추가. Why를 반드시 명시. 변경이력은 STATUS의 "최근 변경 이력"에 동시 기록.
