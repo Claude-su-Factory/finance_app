@@ -83,7 +83,7 @@ per-series 단위라 부분 실패(예: SPX는 채웠고 AAPL은 실패)도 다�
 
 ```go
 func backfillSymbol(ctx context.Context, pool *pgxpool.Pool, yc *yahoo.Client,
-    instrumentID, yahooSymbol string, start, end time.Time) (int, error)
+    instrumentID, yahooSymbol string, start, end time.Time) (int64, error)
 ```
 
 ### A-3. 실행 모델 — 비동기·실패 무시
