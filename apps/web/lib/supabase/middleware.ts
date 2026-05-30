@@ -43,6 +43,15 @@ export async function updateSession(request: NextRequest) {
     if (profile && !profile.onboarding_completed) {
       return NextResponse.redirect(new URL("/app/onboarding", request.url));
     }
+    if (profile?.onboarding_completed) {
+      response.cookies.set("q_onboarded", "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
   }
 
   return response;
