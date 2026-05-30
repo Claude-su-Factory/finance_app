@@ -188,3 +188,95 @@ func backfillSymbol(ctx context.Context, pool *pgxpool.Pool, yc *yahoo.Client,
 	}
 	return ingest.UpsertPrices(ctx, pool, bars)
 }
+
+// SeedIfEmpty는 부팅 시 비어 있는 INDEX·NASDAQ 시리즈만 채운다(멱등, per-series).
+// NASDAQ instrument를 멱등 시드하고(INDEX는 마이그레이션이 시드), 각 대상의 봉 존재 여부를
+// 확인해 0행인 시리즈만 백필한다. 부분 실패는 다음 부팅에서 실패분만 재시도된다(cross-boot self-heal).
+// 하나라도 실패하면 집계 에러를 반환한다(호출자가 Sentry 보고용).
+func SeedIfEmpty(ctx context.Context, pool *pgxpool.Pool, years int) error {
+	// 1) NASDAQ instrument 시드 보장 (멱등 upsert).
+	insts := make([]models.Instrument, 0, len(nasdaqSeed))
+	for _, s := range nasdaqSeed {
+		insts = append(insts, models.Instrument{
+			Symbol: s.Symbol, Exchange: "NASDAQ", Name: s.Name,
+			AssetClass: models.AssetUSStock, Currency: "USD", IsActive: true,
+		})
+	}
+	if _, err := ingest.UpsertInstruments(ctx, pool, insts); err != nil {
+		return fmt.Errorf("seed nasdaq instruments: %w", err)
+	}
+
+	// 2) 대상 조회: INDEX 전체 + NASDAQ 종목.
+	rows, err := pool.Query(ctx,
+		`select id::text, symbol, exchange, asset_class from public.instruments
+		 where (asset_class = 'INDEX' or exchange = 'NASDAQ') and is_active = true
+		 order by symbol`)
+	if err != nil {
+		return fmt.Errorf("query targets: %w", err)
+	}
+	defer rows.Close()
+	type target struct{ id, symbol, exchange, assetClass string }
+	var targets []target
+	for rows.Next() {
+		var t target
+		if err := rows.Scan(&t.id, &t.symbol, &t.exchange, &t.assetClass); err != nil {
+			return fmt.Errorf("scan target: %w", err)
+		}
+		targets = append(targets, t)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate targets: %w", err)
+	}
+
+	yc := yahoo.NewClient()
+	end := time.Now().UTC()
+	start := end.AddDate(-years, 0, 0)
+	var seeded, failures int
+	for _, t := range targets {
+		has, err := hasBars(ctx, pool, t.id)
+		if err != nil {
+			slog.Warn("seed: hasBars failed", "symbol", t.symbol, "err", err)
+			failures++
+			continue
+		}
+		if has {
+			continue // 이미 채워짐 — skip
+		}
+		ysym := seedYahooSymbol(t.assetClass, t.symbol, t.exchange)
+		if ysym == "" {
+			slog.Warn("seed: no yahoo symbol", "symbol", t.symbol, "exchange", t.exchange)
+			continue
+		}
+		n, err := backfillSymbol(ctx, pool, yc, t.id, ysym, start, end)
+		if err != nil {
+			slog.Warn("seed: backfill failed", "symbol", ysym, "err", err)
+			failures++
+			continue
+		}
+		slog.Info("seed: backfilled", "symbol", ysym, "rows", n)
+		seeded++
+		time.Sleep(200 * time.Millisecond) // Yahoo rate limit 보호
+	}
+	slog.Info("seed: done", "seeded", seeded, "failures", failures, "targets", len(targets))
+	if failures > 0 {
+		return fmt.Errorf("seed: %d series failed (will retry next boot)", failures)
+	}
+	return nil
+}
+
+// hasBars는 instrument에 봉이 1개라도 있으면 true.
+func hasBars(ctx context.Context, pool *pgxpool.Pool, instrumentID string) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx,
+		`select exists(select 1 from public.prices where instrument_id = $1)`,
+		instrumentID).Scan(&exists)
+	return exists, err
+}
+
+// seedYahooSymbol은 INDEX면 IndexYahooSymbol, NASDAQ 종목이면 심볼 그대로(RunUS와 동일).
+func seedYahooSymbol(assetClass, symbol, exchange string) string {
+	if assetClass == string(models.AssetIndex) {
+		return schedule.IndexYahooSymbol(symbol, exchange)
+	}
+	return symbol
+}
