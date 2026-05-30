@@ -15,6 +15,9 @@ primary_region = "nrt" # 도쿄 — Supabase ap-northeast-2(서울)와 가까움
 [build]
   dockerfile = "Dockerfile"
 
+[deploy]
+  release_command = "/app/migrate"
+
 [env]
   API_PORT = "8080"
   API_ENV = "production"

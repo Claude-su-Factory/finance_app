@@ -1,0 +1,9 @@
+.git
+apps/web
+**/node_modules
+**/.next
+**/*_test.go
+**/testdata
+**/*.md
+.vscode
+.idea
