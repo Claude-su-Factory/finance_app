@@ -51,5 +51,8 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5",
     "vitest": "^4.1.7"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }
