@@ -28,7 +28,7 @@ export const MOCKS: Record<string, unknown> = {
 };
 
 // 명시적 목이 없는 /v1/* 는 빈 객체로 degrade. 대부분 컴포넌트가 .catch(()=>setX([]))라 안전.
+// Object.hasOwn — `in`은 프로토타입 체인까지 봐서 "toString" 같은 키가 오탐된다.
 export function lookupFixture(pathname: string): unknown {
-  if (pathname in MOCKS) return MOCKS[pathname];
-  return {};
+  return Object.hasOwn(MOCKS, pathname) ? MOCKS[pathname] : {};
 }
