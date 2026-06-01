@@ -6,11 +6,13 @@ import { NewEntryDialog } from "@/components/journal/NewEntryDialog";
 import { AddHoldingDialog } from "@/components/portfolio/AddHoldingDialog";
 import { EditHoldingDialog } from "@/components/portfolio/EditHoldingDialog";
 import { DeleteConfirmDialog } from "@/components/portfolio/DeleteConfirmDialog";
+import type { PaperHolding } from "@/lib/api/paper";
+import type { Holding } from "@/lib/api/holdings";
 
 const noop = () => {};
 
 // TradeDialog.holdings 는 PaperHolding[] (lib/api/paper.ts). /v1/paper/portfolio 픽스처와 동일 형태.
-const samplePaperHoldings = [
+const samplePaperHoldings: PaperHolding[] = [
   {
     id: "ph1", user_id: "preview-user", instrument_id: "i-samsung", symbol: "005930",
     name: "삼성전자", currency: "KRW", quantity: 40, avg_cost: 71000, current_price: 79800,
@@ -21,7 +23,7 @@ const samplePaperHoldings = [
 
 // EditHoldingDialog/DeleteConfirmDialog.holding 은 Holding (lib/api/holdings.ts) — 다른 타입.
 // Holding 전체 필수 필드를 채운다(weight_pct/cost_basis_krw/exchange 포함). holding 누락 시 빈 화면.
-const sampleHolding = {
+const sampleHolding: Holding = {
   id: "h1", instrument_id: "i-samsung", quantity: 50, avg_cost: 68000,
   opened_at: "2026-03-02", note: null,
   created_at: "2026-03-02T00:00:00Z", updated_at: "2026-05-31T00:00:00Z",
