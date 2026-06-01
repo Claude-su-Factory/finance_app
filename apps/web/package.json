@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest"
+    "test": "vitest",
+    "preview": "ENABLE_PREVIEW=1 NEXT_PUBLIC_API_URL=http://localhost:3000/api/preview-mock NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9 NEXT_PUBLIC_SUPABASE_ANON_KEY=preview-anon-key NEXT_PUBLIC_TOSS_DONATION_URL= next dev -p 3000"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
