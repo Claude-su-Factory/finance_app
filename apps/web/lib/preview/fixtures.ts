@@ -21,6 +21,49 @@ export const MOCKS: Record<string, unknown> = {
     },
   ],
 
+  // ── 알파 카드 (홈 AlphaCard) ────────────────────────────────────────────────
+  // AlphaResult (lib/api/portfolio.ts). 쿼리(?period=)는 catch-all이 떼어내 키는 경로만.
+  // Chart가 benchmarks[0]·[1].series를 직접 참조 → 벤치마크 최소 2개 필수(3개 채움).
+  // alpha_pp = portfolio.total_return_pct − benchmark.total_return_pct (정합).
+  "/v1/portfolio/alpha": {
+    period: "90d", days_requested: 90, days_used: 90, since: "2026-03-03",
+    fx_mode: "spot", model: "current_holdings_backward_simulation",
+    portfolio: {
+      total_return_pct: 7.53,
+      series: [
+        { date: "2026-03-03", value_pct: 0 }, { date: "2026-03-24", value_pct: 1.8 },
+        { date: "2026-04-14", value_pct: 3.5 }, { date: "2026-05-05", value_pct: 5.9 },
+        { date: "2026-05-31", value_pct: 7.53 },
+      ],
+    },
+    benchmarks: [
+      {
+        key: "kospi", label: "KOSPI", total_return_pct: 3.2, alpha_pp: 4.33,
+        series: [
+          { date: "2026-03-03", value_pct: 0 }, { date: "2026-03-24", value_pct: 1.1 },
+          { date: "2026-04-14", value_pct: 0.8 }, { date: "2026-05-05", value_pct: 2.4 },
+          { date: "2026-05-31", value_pct: 3.2 },
+        ],
+      },
+      {
+        key: "sp500", label: "S&P 500", total_return_pct: 5.1, alpha_pp: 2.43,
+        series: [
+          { date: "2026-03-03", value_pct: 0 }, { date: "2026-03-24", value_pct: 1.5 },
+          { date: "2026-04-14", value_pct: 2.9 }, { date: "2026-05-05", value_pct: 4.2 },
+          { date: "2026-05-31", value_pct: 5.1 },
+        ],
+      },
+      {
+        key: "kr_us_6040", label: "한·미 60/40", total_return_pct: 4.05, alpha_pp: 3.48,
+        series: [
+          { date: "2026-03-03", value_pct: 0 }, { date: "2026-03-24", value_pct: 1.3 },
+          { date: "2026-04-14", value_pct: 2.0 }, { date: "2026-05-05", value_pct: 3.3 },
+          { date: "2026-05-31", value_pct: 4.05 },
+        ],
+      },
+    ],
+  },
+
   // ── 마켓 (AppShell TopTicker + KRIndicesCard + USIndicesCard) ──────────────
   // TopTicker(AppShell). 실제 ticker 응답 타입에 맞춰 보정. 틀려도 TopTicker는 빈 상태로 degrade.
   "/v1/market/ticker": [
@@ -119,6 +162,60 @@ export const MOCKS: Record<string, unknown> = {
     ],
   },
 
+  // ── 백테스트 (BacktestPage "실행" 시 POST /v1/backtest/run) ──────────────────
+  // BacktestResult (lib/api/backtest.ts). 결과 뷰가 참조하는 전 필드를 채움:
+  // metrics(7) · benchmarks{kospi,spx,sixty_forty}.{equity_series,metrics} · equity_series.
+  // 날짜는 4개 시계열(전략+벤치 3종) 동일하게 맞춰 차트 병합 시 빈 칸 없음.
+  // 정합: 전략 +85%(10M→18.5M), excess_vs_6040 = 85 − 55 = 30.
+  "/v1/backtest/run": {
+    clamped_start: "2021-06-01", end: "2026-05-31",
+    normalized_basket: [
+      { instrument_id: "i-samsung", symbol: "005930", name: "삼성전자", weight: 0.6 },
+      { instrument_id: "i-aapl", symbol: "AAPL", name: "Apple Inc.", weight: 0.4 },
+    ],
+    equity_series: [
+      { date: "2021-06-01", value: 10000000 }, { date: "2022-06-01", value: 11800000 },
+      { date: "2023-06-01", value: 13200000 }, { date: "2024-06-01", value: 15100000 },
+      { date: "2025-06-01", value: 16900000 }, { date: "2026-05-31", value: 18500000 },
+    ],
+    contributed_series: [
+      { date: "2021-06-01", value: 10000000 }, { date: "2022-06-01", value: 10000000 },
+      { date: "2023-06-01", value: 10000000 }, { date: "2024-06-01", value: 10000000 },
+      { date: "2025-06-01", value: 10000000 }, { date: "2026-05-31", value: 10000000 },
+    ],
+    benchmarks: {
+      kospi: {
+        equity_series: [
+          { date: "2021-06-01", value: 10000000 }, { date: "2022-06-01", value: 10900000 },
+          { date: "2023-06-01", value: 11600000 }, { date: "2024-06-01", value: 12700000 },
+          { date: "2025-06-01", value: 13500000 }, { date: "2026-05-31", value: 14200000 },
+        ],
+        metrics: { total_return_pct: 42.0, cagr_pct: 7.2, mdd_pct: -28.5, volatility_pct: 20.1, twr_pct: 42.0 },
+      },
+      spx: {
+        equity_series: [
+          { date: "2021-06-01", value: 10000000 }, { date: "2022-06-01", value: 11500000 },
+          { date: "2023-06-01", value: 13000000 }, { date: "2024-06-01", value: 14600000 },
+          { date: "2025-06-01", value: 15800000 }, { date: "2026-05-31", value: 16800000 },
+        ],
+        metrics: { total_return_pct: 68.0, cagr_pct: 11.0, mdd_pct: -19.8, volatility_pct: 16.4, twr_pct: 68.0 },
+      },
+      sixty_forty: {
+        equity_series: [
+          { date: "2021-06-01", value: 10000000 }, { date: "2022-06-01", value: 11200000 },
+          { date: "2023-06-01", value: 12400000 }, { date: "2024-06-01", value: 13700000 },
+          { date: "2025-06-01", value: 14700000 }, { date: "2026-05-31", value: 15500000 },
+        ],
+        metrics: { total_return_pct: 55.0, cagr_pct: 9.2, mdd_pct: -15.2, volatility_pct: 12.1, twr_pct: 55.0 },
+      },
+    },
+    metrics: {
+      total_return_pct: 85.0, cagr_pct: 13.1, mdd_pct: -22.4, volatility_pct: 18.6,
+      excess_vs_6040_pct: 30.0, total_contributed: 10000000, final_equity: 18500000,
+    },
+    coverage_warnings: [],
+  },
+
   // ── 채팅 ────────────────────────────────────────────────────────────────────
   "/v1/chat/sessions": [
     {
@@ -152,6 +249,17 @@ export const MOCKS: Record<string, unknown> = {
       name: "Taiwan Semiconductor", asset_class: "US_STOCK", currency: "USD",
       price: 182.3, change_pct: -0.58, added_at: "2026-05-10T00:00:00Z",
     },
+  ],
+
+  // ── 종목 검색 (InstrumentSearchInput: 백테스트 바스켓·종목 추가 모달 공용) ──────
+  // InstrumentResult[] (lib/api/instruments.ts). ?q= 는 catch-all이 제거 → 검색어 무관 동일 목록.
+  // INDEX/FX/CASH는 handlePick에서 선택 차단 → 보유·바스켓 가능한 자산만 둔다.
+  "/v1/instruments/search": [
+    { id: "i-samsung", symbol: "005930", exchange: "KRX", name: "삼성전자", currency: "KRW", asset_class: "KR_STOCK" },
+    { id: "i-hynix", symbol: "000660", exchange: "KRX", name: "SK하이닉스", currency: "KRW", asset_class: "KR_STOCK" },
+    { id: "i-aapl", symbol: "AAPL", exchange: "NASDAQ", name: "Apple Inc.", currency: "USD", asset_class: "US_STOCK" },
+    { id: "i-nvda", symbol: "NVDA", exchange: "NASDAQ", name: "NVIDIA", currency: "USD", asset_class: "US_STOCK" },
+    { id: "i-spy", symbol: "SPY", exchange: "NYSE", name: "SPDR S&P 500 ETF", currency: "USD", asset_class: "ETF" },
   ],
 };
 
