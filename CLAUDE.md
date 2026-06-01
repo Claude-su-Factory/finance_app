@@ -14,10 +14,8 @@
 - [`docs/E2E_SMOKE.md`](docs/E2E_SMOKE.md) — 배포 직후 골든패스 수동 스모크 시나리오
 - [`docs/superpowers/specs/`](docs/superpowers/specs/) — 기능별 상세 설계 문서
   - [`2026-05-28-identity-3-pillars.md`](docs/superpowers/specs/2026-05-28-identity-3-pillars.md) — **정체성 3축**(실 자산·Paper·AI 학습) + 수익률 랭킹 영구 불가 + AI 매매 일기 격상 + 안내 의무 (전략 결정 박제)
-  - [`2026-05-28-alpha-card-design.md`](docs/superpowers/specs/2026-05-28-alpha-card-design.md) — **알파 카드** 설계: 홈 1행 3번째에 "포트 vs KOSPI·S&P·한미 60/40" 비교. 기간 토글·시점별 환율·backward simulation
-  - [`2026-05-28-ai-trading-journal-design.md`](docs/superpowers/specs/2026-05-28-ai-trading-journal-design.md) — **AI 매매 일기** 설계: CRUD 통합(auto) + 별도 페이지(manual) 하이브리드. 월간 자동 회고 cron + on-demand 분석 버튼 + 채팅 `analyze_journal` 도구
-  - [`2026-05-28-paper-trading-design.md`](docs/superpowers/specs/2026-05-28-paper-trading-design.md) — **Paper Trading (라이브)** 설계: 사이드바 신규 탭 + 가상 자금(₩1,000만 default) + 즉시 시장가 체결 + 매매 일기 자동 통합. 백테스트(B)는 별도 서브시스템
-- [`docs/superpowers/plans/`](docs/superpowers/plans/) — 기능별 구현 계획
+  - [`specs/archive/`](docs/superpowers/specs/archive/) — 출시 완료 기능 설계(알파 카드·AI 매매 일기·Paper Trading·백테스트·운영 자동화·MVP 설계). 역사 참고용
+- [`docs/superpowers/plans/`](docs/superpowers/plans/) — 기능별 구현 계획 (완료분은 [`plans/archive/`](docs/superpowers/plans/archive/))
 
 ## 운영 원칙
 

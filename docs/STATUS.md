@@ -15,7 +15,7 @@
 
 ## Phase 0 스펙 섹션 (완료, 참고용)
 
-`docs/superpowers/specs/2026-05-22-quotient-mvp-design.md` 10개 섹션 모두 확정 + 검토 이력 포함. 신규 작업 시 본 spec 우선 참조.
+`docs/superpowers/specs/archive/2026-05-22-quotient-mvp-design.md` 10개 섹션 모두 확정 + 검토 이력 포함. 신규 작업 시 본 spec 우선 참조.
 
 - ✅ 섹션 1 정체성·카피 / 섹션 2 정보 구조(잠정) / 섹션 3 데이터 모델 / 섹션 4 데이터 수집 / 섹션 5 AI 채팅 / 섹션 6 정보 구조 락인 / 섹션 7 인증·결제·구독 / 섹션 8 에러·관측·보안 / 섹션 9 테스트·배포·MVP 일정 / 섹션 10 보강 명세 + 검토 이력
 
