@@ -1,6 +1,6 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-06-01 (UI 인터랙티브 미리보기 추가)
+마지막 업데이트: 2026-06-01 (미리보기 최종 리뷰 반영 — 홈 화이트스크린 해소)
 
 ## 현재 Phase
 
@@ -129,6 +129,7 @@
 
 ## 최근 변경 이력
 
+- 2026-06-01 미리보기 최종 리뷰 반영 — 홈 `AlphaCard`가 `/v1/portfolio/alpha` 목 누락 시 `benchmarks.map` 화이트스크린 나던 결함 해소(벤치마크 3 + 시점 시리즈 픽스처). 종목 검색(`/v1/instruments/search` 배열 목)·백테스트(`/v1/backtest/run` 결과 목 + 라우트 `READ_LIKE_POSTS` allowlist) 배선 완료. 쓰기 POST(`/v1/holdings`·`/v1/journal/entries`)는 `{ok:true}` 유지(충돌 없음). 최종 코드 리뷰 READY. `eb29e75`.
 - 2026-06-01 UI 인터랙티브 미리보기 출시 — `npm run preview`(`ENABLE_PREVIEW=1` + 더미 env + `next dev -p 3000`). `/preview/*` 10개 라우트(허브·홈·포트폴리오·Paper·마켓·저널·백테스트·채팅·온보딩·모달) + `/api/preview-mock/[...path]` catch-all 목 API + `lib/preview/fixtures.ts` 한국어 픽스처 + `lib/preview/screens.ts` 스크린 목록 + `PreviewSwitcher` 우하단 고정. 신규 런타임 의존성 0. 백엔드·DB·인증 불필요.
 - 2026-05-30 운영 자동화: 부팅 시 지수·NASDAQ 자동 백필(SeedIfEmpty, 비동기·멱등) + Fly release_command Go 마이그레이터(이력 테이블 공유).
 - 2026-05-30 미들웨어 N+1 제거 — `/app/*` 매 요청 `profiles.onboarding_completed` 조회를 read-through 쿠키 캐시로 제거. `onboarding_completed` 확인 시 `q_onboarded=1`(httpOnly·prod secure·sameSite lax·1년) 발급 → 이후 요청은 쿠키 있으면 조회 스킵. `auth.getUser()` 세션 검증은 매 요청 유지(쿠키는 프로필 조회만 단축, 인증 대체 X). 단조 플래그라 stale/위조 쿠키 무해(자기 온보딩 화면 스킵뿐). TDD 3 커밋(read-through write → read gate → 코드리뷰 반영) + 단위 테스트 4(write·skip·redirect·null degrade) + 스펙/코드 2단계 리뷰 APPROVED. 신규 USER_ACTION 0. `apps/web/lib/supabase/middleware.ts`.
