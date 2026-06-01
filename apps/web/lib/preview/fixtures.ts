@@ -34,7 +34,7 @@ export const MOCKS: Record<string, unknown> = {
   // ── Paper Trading ──────────────────────────────────────────────────────────
   "/v1/paper/portfolio": {
     account: {
-      user_id: "preview-user", initial_cash: 10000000, cash_balance: 4200000,
+      user_id: "preview-user", initial_cash: 10000000, cash_balance: 6029504,
       base_currency: "KRW", created_at: "2026-03-01T00:00:00Z", updated_at: "2026-05-31T00:00:00Z",
     },
     holdings: [
@@ -47,16 +47,16 @@ export const MOCKS: Record<string, unknown> = {
       {
         id: "ph2", user_id: "preview-user", instrument_id: "i-nvda", symbol: "NVDA",
         name: "NVIDIA", currency: "USD", quantity: 8, avg_cost: 102.4, current_price: 138.7,
-        market_value: 1109.6, market_value_krw: 1531248, pnl_krw: 400000, pnl_pct: 35.4,
+        market_value: 1109.6, market_value_krw: 1531248, pnl_krw: 400752, pnl_pct: 35.45,
         created_at: "2026-04-10T00:00:00Z", updated_at: "2026-05-31T00:00:00Z",
       },
     ],
-    summary: { total_equity_krw: 8923248, total_pnl_krw: 752000, total_pnl_pct: 9.2 },
+    summary: { total_equity_krw: 10752752, total_pnl_krw: 752752, total_pnl_pct: 7.53 },
     equity_series: [
       { date: "2026-03-01", equity_krw: 10000000 },
-      { date: "2026-04-01", equity_krw: 9650000 },
-      { date: "2026-05-01", equity_krw: 9420000 },
-      { date: "2026-05-31", equity_krw: 8923248 },
+      { date: "2026-04-01", equity_krw: 10210000 },
+      { date: "2026-05-01", equity_krw: 10480000 },
+      { date: "2026-05-31", equity_krw: 10752752 },
     ],
   },
   "/v1/paper/transactions": {
@@ -98,10 +98,10 @@ export const MOCKS: Record<string, unknown> = {
       {
         id: "je3", user_id: "preview-user", entry_type: "auto",
         action: "buy", related_holding_id: "h2",
-        related_holding: { symbol: "NVDA", name: "NVIDIA" },
-        related_symbols: ["NVDA"],
-        title: "NVIDIA 매수",
-        content: "AI 인프라 수요 장기화 전망. 데이터센터 GPU 독점적 위상 유지. 분할 매수 1차.",
+        related_holding: { symbol: "AAPL", name: "Apple Inc." },
+        related_symbols: ["AAPL"],
+        title: "Apple 매수",
+        content: "서비스 매출 비중 확대와 견조한 아이폰 수요. 환율 부담에도 분할 매수로 접근.",
         created_at: "2026-04-10T01:00:00Z", updated_at: "2026-04-10T01:00:00Z",
       },
     ],
@@ -112,7 +112,7 @@ export const MOCKS: Record<string, unknown> = {
       {
         id: "an1", user_id: "preview-user", run_type: "auto_monthly",
         period_start: "2026-05-01", period_end: "2026-05-31",
-        entries_count: 5, model: "claude-sonnet-4-5",
+        entries_count: 5, model: "claude-sonnet-4-6",
         content_md: "## 5월 매매 회고\n\n삼성전자·NVDA 중심의 반도체 포지션이 월간 수익률을 견인했습니다. 전반적으로 매수 타이밍 판단이 적절했으며, 분할 매수 전략이 변동성 리스크를 낮추는 데 효과적이었습니다.",
         created_at: "2026-06-01T00:00:00Z",
       },
