@@ -10,6 +10,7 @@
 (백테스트 커버리지 경고 결함 fix 완료(2026-05-30): 경고 기준선을 `naturalStart`로 교정 + 벤치마크·fx 사유 경고 추가. STATUS 참조.)
 (미들웨어 N+1 제거 완료(2026-05-30): read-through 쿠키 캐시(`q_onboarded`)로 매 `/app/*` profiles 조회 제거. 단조 플래그 → 캐시 안전. STATUS 참조.)
 (운영 자동화 완료(2026-05-30): 부팅 시 지수·NASDAQ 자동 백필(`SeedIfEmpty`, 비동기·멱등) + Fly `release_command` Go 마이그레이터(이력 테이블 공유). 사용자 수동 ops 0. STATUS 참조.)
+(UI 인터랙티브 미리보기 완료(2026-06-01): `npm run preview`로 전 화면을 가짜 데이터로 브라우저 검수. 백엔드·DB·인증 불필요. STATUS 참조.)
 
 **현재 추천 다음 작업**: 아래 외부 계정·키 발급을 순서대로 완료하면 production 배포가 가능하다.
 
