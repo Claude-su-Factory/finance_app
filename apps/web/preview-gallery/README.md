@@ -16,6 +16,8 @@ npm run preview        # ENABLE_PREVIEW=1 + 더미 env로 next dev -p 3000
 
 ## 구조
 
+경로는 모두 `apps/web/` 기준.
+
 - `app/preview/*` — 미리보기 라우트(실제 컴포넌트 렌더)
 - `app/api/preview-mock/[...path]/route.ts` — `/v1/*` 목 API(catch-all)
 - `lib/preview/fixtures.ts` — 엔드포인트별 한국어 목 + `lookupFixture`
