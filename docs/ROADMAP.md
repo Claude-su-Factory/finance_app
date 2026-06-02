@@ -11,6 +11,7 @@
 (미들웨어 N+1 제거 완료(2026-05-30): read-through 쿠키 캐시(`q_onboarded`)로 매 `/app/*` profiles 조회 제거. 단조 플래그 → 캐시 안전. STATUS 참조.)
 (운영 자동화 완료(2026-05-30): 부팅 시 지수·NASDAQ 자동 백필(`SeedIfEmpty`, 비동기·멱등) + Fly `release_command` Go 마이그레이터(이력 테이블 공유). 사용자 수동 ops 0. STATUS 참조.)
 (UI 인터랙티브 미리보기 완료(2026-06-01): `npm run preview`로 전 화면을 가짜 데이터로 브라우저 검수. 백엔드·DB·인증 불필요. STATUS 참조.)
+(SEO·AEO·GEO 기반 구축 완료(2026-06-02): 메타데이터 단일소스 + robots/sitemap/manifest + JSON-LD 4종 + 코드 생성 OG/파비콘 + 기존 FAQ를 FAQPage로 구조화. 범위 ①(기반 + 기존 콘텐츠 구조화)만. 콘텐츠/블로그(②)는 Phase 2로 이연. STATUS 참조.)
 
 **현재 추천 다음 작업**: 아래 외부 계정·키 발급을 순서대로 완료하면 production 배포가 가능하다.
 
@@ -23,6 +24,7 @@
 5. **GitHub Secrets 등록** — `FLY_API_TOKEN` 등 (`docs/DEPLOY.md` §7)
 6. **E2E 스모크 검증** — 배포 직후 `docs/E2E_SMOKE.md` 시나리오 수동 통과
 7. **Anthropic API 키 발급** — production 키 → Fly secrets에 주입
+8. **`NEXT_PUBLIC_SITE_URL` 설정 + 검색엔진 등록** — 배포 절대 URL 주입(메타데이터·JSON-LD 도메인 확정) → Google Search Console·Naver 서치어드바이저에 사이트 등록 + `/sitemap.xml` 제출 (`docs/USER_ACTIONS.md`)
 
 ## Phase 0 — 스펙 (현재)
 
@@ -77,6 +79,7 @@
 | 1 | AdSense 가입 + `ENABLE_ADS=true` (가입자 100명 + 일평균 PV 500 도달 시) |
 | 2 | 조건 알림 (가격·지표, 이메일/디스코드) |
 | 2 | 주간·월간 자동 리포트 |
+| 2 | SEO 콘텐츠 축(②) — 블로그·용어 사전·비교 페이지로 롱테일 검색 유입 (기반 ①은 2026-06-02 완료) |
 | 3 | 종목 심층 분석 페이지 |
 
 ## Phase 3 — 자동화

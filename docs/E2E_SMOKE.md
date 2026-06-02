@@ -137,6 +137,19 @@
 
 ---
 
+## 10. SEO·AEO·GEO (1분)
+
+> 전제: `NEXT_PUBLIC_SITE_URL`이 배포 도메인으로 설정됨. 인증 불필요(공개 경로).
+
+- [ ] `https://<도메인>/robots.txt` → 200, `User-Agent: *` 그룹 + AI 봇 그룹(GPTBot·ClaudeBot·PerplexityBot 등) + `Sitemap:` 라인 표시
+- [ ] `https://<도메인>/sitemap.xml` → 200, `<url>` 4개(`/`·`/pricing`·`/privacy`·`/terms`), `<loc>`가 로컬호스트가 아닌 배포 도메인
+- [ ] `https://<도메인>/opengraph-image`·`/icon`·`/brand-512` → 각각 `content-type: image/png`
+- [ ] 홈 소스 보기 → `application/ld+json` 4개(Organization·WebSite·SoftwareApplication·FAQPage) 존재
+- [ ] 링크 공유 OG 카드 — 슬랙/카카오톡/X에 홈 URL 붙여넣기 → QUOTIENT 영문 OG 이미지 + 제목·설명 미리보기 노출
+- [ ] [Rich Results Test](https://search.google.com/test/rich-results)에 홈 URL → `FAQPage` 인식(질문 4개) + 오류 0
+
+---
+
 ## 알려진 비-스모크 항목 (수동 검증 외)
 
 - 결제 흐름 — Phase 2 사업자 등록 후

@@ -51,6 +51,8 @@
   - `NEXT_PUBLIC_API_URL` (Fly 도메인)
   - `NEXT_PUBLIC_SENTRY_DSN_WEB`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`
   - `NEXT_PUBLIC_ENV=production`, `NEXT_PUBLIC_ENABLE_ADS=false`
+  - `NEXT_PUBLIC_SITE_URL` — 배포 절대 URL(예: `https://quotient.app`). **프로덕션 사실상 필수** — 정적 메타데이터·JSON-LD가 모듈-평가 시점에 도메인을 굽기 때문. 미설정 시 `VERCEL_PROJECT_PRODUCTION_URL` 폴백(자동 URL) → 커스텀 도메인 확정 후 반드시 명시 주입. 미설정 + Vercel 외 환경에서는 `http://localhost:3000`으로 구워질 위험
+  - (검색엔진 등록 후) `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`, `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` — 아래 "검색엔진 등록" 절 참조
 
 - [ ] **GitHub Secrets** (Repository Settings → Secrets):
   - `FLY_API_TOKEN` (`flyctl tokens create deploy --name "github-actions"` 출력)
@@ -60,6 +62,15 @@
 
 - [ ] **Site URL + Redirect URLs** — Dashboard → Authentication → URL Configuration에 Vercel 도메인 등록
 - [ ] **(옵션) Google OAuth 활성화** — Google Cloud Console에서 OAuth 2.0 Client 생성 후 Supabase에 client_id/secret 입력
+
+### 검색엔진 등록 (SEO·AEO·GEO — 배포 후 노출)
+
+> 전제: `NEXT_PUBLIC_SITE_URL`이 커스텀 도메인으로 설정되어 있어야 사이트맵·메타데이터 URL이 올바르게 발급된다.
+
+- [ ] **Google Search Console** (필수) — 속성 추가 → HTML 태그 인증 토큰 복사 → Vercel env `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=<토큰>` 주입 후 재배포 → 콘솔에서 인증 → `Sitemaps`에 `https://<도메인>/sitemap.xml` 제출
+- [ ] **Naver 서치어드바이저** (국내 권장) — 사이트 등록 → HTML 태그 인증 토큰 → Vercel env `NEXT_PUBLIC_NAVER_SITE_VERIFICATION=<토큰>` 주입 후 재배포 → 인증 → 사이트맵 제출
+- [ ] **Bing Webmaster Tools** (선택) — "Import from Google Search Console"로 5분 등록(별도 env 불필요)
+- [ ] **Rich Results Test** (권장) — 배포 후 https://search.google.com/test/rich-results 에서 홈 URL 입력 → `FAQPage`·`Organization`·`WebSite`·`SoftwareApplication` 구조화 데이터 인식 확인
 
 ### 배포 후 검증
 

@@ -1,8 +1,16 @@
 import Link from "next/link";
+import { FAQ_ITEMS } from "@/lib/faq";
+import { pageMetadata } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { faqPageJsonLd, softwareApplicationJsonLd } from "@/lib/jsonld";
+
+export const metadata = pageMetadata({ path: "/" });
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-bg text-fg">
+      <JsonLd data={softwareApplicationJsonLd()} />
+      <JsonLd data={faqPageJsonLd()} />
       <LiveTickerBar />
       <Hero />
       <DashboardPreview />
@@ -333,31 +341,13 @@ function TrustCards() {
 
 /* ──────────────── FAQ ──────────────── */
 function FAQ() {
-  const qs = [
-    {
-      q: "보유 자산은 어떻게 검증하나요?",
-      a: "검증하지 않습니다. 사용자가 직접 입력하며 본인 분석 도구로 제공합니다. 다른 사용자에게 노출되지 않으므로 본인 정확도가 곧 분석 정확도입니다.",
-    },
-    {
-      q: "다른 핀테크(토스·뱅크샐러드)와 차이는?",
-      a: "그쪽은 마이데이터로 통합 자산 관리. 우리는 라이선스 없이 분석에만 집중 — 정보 밀도가 높은 모노스페이스 UI, 자연어 AI 분석가, 한국+미국 자산 한 화면. 개발자·파워유저 타겟.",
-    },
-    {
-      q: "AI는 어떤 모델인가요? 비용은?",
-      a: "Anthropic Claude 기반입니다. 지금은 무료로 월 30회까지 쓸 수 있고, 이후 Pro 플랜으로 한도를 넓힐 예정입니다.",
-    },
-    {
-      q: "Paper Trading은 언제 나오나요?",
-      a: "정식 출시 이후 순차적으로 공개할 예정입니다. 가상 자금 + 백테스트 + AI 매매 일기를 한 번에 제공합니다.",
-    },
-  ];
   return (
     <section className="border-b border-line">
       <div className="max-w-3xl mx-auto px-6 py-20">
         <p className="font-mono text-xs text-fg-muted tracking-widest mb-3">FAQ</p>
         <h2 className="text-3xl mb-10">자주 묻는 질문.</h2>
         <div className="space-y-px bg-line border border-line">
-          {qs.map((it) => (
+          {FAQ_ITEMS.map((it) => (
             <details key={it.q} className="bg-bg group">
               <summary className="px-5 py-4 cursor-pointer flex items-baseline gap-3 list-none">
                 <span className="font-mono text-bb-accent text-xs">Q.</span>

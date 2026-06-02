@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "개인정보 처리방침 — Quotient" };
+export const metadata = pageMetadata({
+  title: "개인정보 처리방침",
+  description: "Quotient 개인정보 처리방침.",
+  path: "/privacy",
+});
 
 export default function Privacy() {
   return (

@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "서비스 약관 — Quotient" };
+export const metadata = pageMetadata({
+  title: "서비스 약관",
+  description: "Quotient 서비스 약관.",
+  path: "/terms",
+});
 
 export default function Terms() {
   return (

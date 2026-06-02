@@ -1,7 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "가격 — Quotient" };
+export const metadata = pageMetadata({
+  title: "가격",
+  description: "Quotient 요금제 — 무료로 시작하고 Pro로 한도를 넓히세요.",
+  path: "/pricing",
+});
 
 export default function Pricing() {
   return (

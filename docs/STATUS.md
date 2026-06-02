@@ -1,6 +1,6 @@
 # Quotient — 구현 상태
 
-마지막 업데이트: 2026-06-01 (미리보기 최종 리뷰 반영 — 홈 화이트스크린 해소)
+마지막 업데이트: 2026-06-02 (SEO·AEO·GEO 기반 구축)
 
 ## 현재 Phase
 
@@ -100,6 +100,7 @@
 - ✅ Paper Trading (라이브) — 가상 자금 매매 시뮬레이션. `/app/paper` 페이지, 매매·리셋 모달, 평가액 시계열 차트, 매매 일기 통합.
 - ✅ AI 채팅 교육자 역할 — 개념 질문(PER·분산투자 등)에 도구 없이 친절 설명. 데이터 footer는 시세·보유 데이터 사용 답변에만 부착(`usedAnyTool` 게이팅). 정체성 spec §3 교육자 역할.
 - ✅ Paper Trading 백테스트 (서브시스템 B) — 과거 시점 시뮬레이션. `/app/backtest`, 선언적 바스켓(최대 10·자동 정규화) + 2축 전략(일시불/월 적립 × 없음·분기·반기·연), NAV/유닛 적립중립 수익률, 단일 `simulate()`로 KOSPI·S&P·한미 60/40 동시 비교(초과수익 vs 60/40), XIRR·MDD·변동성, 5년 클램프 + 커버리지 경고. 무상태(신규 테이블 0). `internal/portfolio/backtest.go` + `POST /v1/backtest/run`.
+- ✅ SEO·AEO·GEO 기반 구축 — 도메인·카피·브랜드 색 단일 소스(`lib/seo.ts`) + 순수 함수 메타데이터 빌더(`buildRootMetadata`/`pageMetadata`). 파일 컨벤션 라우트 6종: `robots.ts`(AI 봇 크롤링 허용 + 비공개 경로 차단)·`sitemap.ts`(4 URL)·`manifest.ts`·`icon.tsx`·`brand-512`·`opengraph-image.tsx`(영문 OG, `next/og` 코드 생성). JSON-LD 4종(`Organization`·`WebSite`·`SoftwareApplication`·`FAQPage`)을 layout·landing에 주입(`components/seo/JsonLd.tsx`). 기존 랜딩 FAQ를 `lib/faq.ts` 단일 소스로 추출해 렌더·FAQPage 공용. 검색엔진(SEO)·답변엔진(AEO)·생성엔진(GEO) 노출·인용 기반. spec `2026-06-02-seo-aeo-geo-design.md`.
 
 ## 알려진 결함 / 백로그
 
@@ -129,7 +130,7 @@
 
 ## 최근 변경 이력
 
-- 2026-06-01 미리보기 최종 리뷰 반영 — 홈 `AlphaCard`가 `/v1/portfolio/alpha` 목 누락 시 `benchmarks.map` 화이트스크린 나던 결함 해소(벤치마크 3 + 시점 시리즈 픽스처). 종목 검색(`/v1/instruments/search` 배열 목)·백테스트(`/v1/backtest/run` 결과 목 + 라우트 `READ_LIKE_POSTS` allowlist) 배선 완료. 쓰기 POST(`/v1/holdings`·`/v1/journal/entries`)는 `{ok:true}` 유지(충돌 없음). 최종 코드 리뷰 READY. `eb29e75`.
+- 2026-06-02 SEO·AEO·GEO 기반 구축 — 메타데이터 단일소스(`lib/seo.ts`: 도메인 `siteUrl()` env 우선순위 + `buildRootMetadata`/`pageMetadata` 순수 함수)·robots/sitemap/manifest 파일 컨벤션 라우트·JSON-LD 4종(Organization·WebSite·SoftwareApplication·FAQPage, `components/seo/JsonLd.tsx` 주입)·코드 생성 OG/파비콘(`next/og` ImageResponse, 영문 카피, `opengraph-image`·`icon`·`brand-512`). 기존 랜딩 FAQ를 `lib/faq.ts`로 추출(렌더 + FAQPage 공용 단일 소스). robots는 AI 봇 9종(GPTBot·ClaudeBot·PerplexityBot 등) 명시 허용 + 비공개 경로(`/app`·`/api`·인증) 차단 → GEO 인용 허용. 신규 콘텐츠/블로그 없음(범위 ①: 기반 + 기존 구조화). 단위 테스트 11(seo 9 + faq 렌더 2), `next build` + 런타임 fetch로 이미지 3종 `image/png`·robots AI 봇 그룹·sitemap 4 URL·JSON-LD 4종 확인. 프로덕션 도메인은 `NEXT_PUBLIC_SITE_URL`로 주입(USER_ACTIONS 등재). — 홈 `AlphaCard`가 `/v1/portfolio/alpha` 목 누락 시 `benchmarks.map` 화이트스크린 나던 결함 해소(벤치마크 3 + 시점 시리즈 픽스처). 종목 검색(`/v1/instruments/search` 배열 목)·백테스트(`/v1/backtest/run` 결과 목 + 라우트 `READ_LIKE_POSTS` allowlist) 배선 완료. 쓰기 POST(`/v1/holdings`·`/v1/journal/entries`)는 `{ok:true}` 유지(충돌 없음). 최종 코드 리뷰 READY. `eb29e75`.
 - 2026-06-01 UI 인터랙티브 미리보기 출시 — `npm run preview`(`ENABLE_PREVIEW=1` + 더미 env + `next dev -p 3000`). `/preview/*` 10개 라우트(허브·홈·포트폴리오·Paper·마켓·저널·백테스트·채팅·온보딩·모달) + `/api/preview-mock/[...path]` catch-all 목 API + `lib/preview/fixtures.ts` 한국어 픽스처 + `lib/preview/screens.ts` 스크린 목록 + `PreviewSwitcher` 우하단 고정. 신규 런타임 의존성 0. 백엔드·DB·인증 불필요.
 - 2026-05-30 운영 자동화: 부팅 시 지수·NASDAQ 자동 백필(SeedIfEmpty, 비동기·멱등) + Fly release_command Go 마이그레이터(이력 테이블 공유).
 - 2026-05-30 미들웨어 N+1 제거 — `/app/*` 매 요청 `profiles.onboarding_completed` 조회를 read-through 쿠키 캐시로 제거. `onboarding_completed` 확인 시 `q_onboarded=1`(httpOnly·prod secure·sameSite lax·1년) 발급 → 이후 요청은 쿠키 있으면 조회 스킵. `auth.getUser()` 세션 검증은 매 요청 유지(쿠키는 프로필 조회만 단축, 인증 대체 X). 단조 플래그라 stale/위조 쿠키 무해(자기 온보딩 화면 스킵뿐). TDD 3 커밋(read-through write → read gate → 코드리뷰 반영) + 단위 테스트 4(write·skip·redirect·null degrade) + 스펙/코드 2단계 리뷰 APPROVED. 신규 USER_ACTION 0. `apps/web/lib/supabase/middleware.ts`.

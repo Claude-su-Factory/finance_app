@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 import { PostHogProvider } from "@/components/analytics/PostHogProvider";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildRootMetadata } from "@/lib/seo";
+import { organizationJsonLd, webSiteJsonLd } from "@/lib/jsonld";
 import "./globals.css";
 
 const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
@@ -22,10 +24,7 @@ const pretendard = localFont({
   weight: "45 920", // variable font weight range
 });
 
-export const metadata: Metadata = {
-  title: "Quotient — Portfolio Intelligence Terminal",
-  description: "한국·미국 자산을 한 화면에. 자연어로 묻고, 즉시 분석을 받으세요.",
-};
+export const metadata = buildRootMetadata();
 
 export default function RootLayout({
   children,
@@ -35,6 +34,8 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`${geistMono.variable} ${pretendard.variable} dark`}>
       <body>
+        <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={webSiteJsonLd()} />
         {ADS_ENABLED && ADSENSE_CLIENT ? (
           <Script
             async
